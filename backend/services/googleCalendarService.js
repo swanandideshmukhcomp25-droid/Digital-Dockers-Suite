@@ -143,10 +143,127 @@ const refreshAccessToken = async (refreshToken) => {
     }
 };
 
+/**
+ * Create a Google Calendar event for a task (without Google Meet)
+ * @param {string} accessToken - User's OAuth access token
+ * @param {Object} taskDetails - Task details
+ * @returns {string} - Created event ID
+ */
+const createTaskCalendarEvent = async (accessToken, taskDetails) => {
+    const oauth2Client = createOAuth2Client();
+    oauth2Client.setCredentials({ access_token: accessToken });
+
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    // Task events are all-day or have specific deadline time
+    const dueDate = new Date(taskDetails.dueDate);
+
+    const event = {
+        summary: `📋 Task: ${taskDetails.title}`,
+        description: taskDetails.description || 'Task assigned to you',
+        start: {
+            dateTime: dueDate.toISOString(),
+            timeZone: 'Asia/Kolkata',
+        },
+        end: {
+            dateTime: new Date(dueDate.getTime() + 60 * 60000).toISOString(), // 1 hour duration
+            timeZone: 'Asia/Kolkata',
+        },
+        colorId: '11', // Red color for tasks
+        reminders: {
+            useDefault: false,
+            overrides: [
+                { method: 'popup', minutes: 60 }, // 1 hour before
+                { method: 'popup', minutes: 1440 }, // 1 day before
+            ],
+        },
+    };
+
+    try {
+        const response = await calendar.events.insert({
+            calendarId: 'primary',
+            resource: event,
+        });
+
+        return response.data.id;
+    } catch (error) {
+        console.error('Error creating task calendar event:', error.message);
+        throw error;
+    }
+};
+
+/**
+ * Update a Google Calendar event for a task
+ * @param {string} accessToken - User's OAuth access token
+ * @param {string} eventId - Calendar event ID
+ * @param {Object} taskDetails - Updated task details
+ * @returns {boolean} - Success status
+ */
+const updateTaskCalendarEvent = async (accessToken, eventId, taskDetails) => {
+    const oauth2Client = createOAuth2Client();
+    oauth2Client.setCredentials({ access_token: accessToken });
+
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    const dueDate = new Date(taskDetails.dueDate);
+
+    const event = {
+        summary: `📋 Task: ${taskDetails.title}`,
+        description: taskDetails.description || 'Task assigned to you',
+        start: {
+            dateTime: dueDate.toISOString(),
+            timeZone: 'Asia/Kolkata',
+        },
+        end: {
+            dateTime: new Date(dueDate.getTime() + 60 * 60000).toISOString(),
+            timeZone: 'Asia/Kolkata',
+        },
+    };
+
+    try {
+        await calendar.events.patch({
+            calendarId: 'primary',
+            eventId: eventId,
+            resource: event,
+        });
+        return true;
+    } catch (error) {
+        console.error('Error updating task calendar event:', error.message);
+        throw error;
+    }
+};
+
+/**
+ * Delete a Google Calendar event for a task
+ * @param {string} accessToken - User's OAuth access token
+ * @param {string} eventId - Calendar event ID
+ * @returns {boolean} - Success status
+ */
+const deleteTaskCalendarEvent = async (accessToken, eventId) => {
+    const oauth2Client = createOAuth2Client();
+    oauth2Client.setCredentials({ access_token: accessToken });
+
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    try {
+        await calendar.events.delete({
+            calendarId: 'primary',
+            eventId: eventId,
+        });
+        return true;
+    } catch (error) {
+        console.error('Error deleting task calendar event:', error.message);
+        throw error;
+    }
+};
+
 module.exports = {
     createCalendarEventWithMeet,
     getCalendarAuthUrl,
     getTokensFromCode,
     listEvents,
-    refreshAccessToken
+    refreshAccessToken,
+    createTaskCalendarEvent,
+    updateTaskCalendarEvent,
+    deleteTaskCalendarEvent
 };
