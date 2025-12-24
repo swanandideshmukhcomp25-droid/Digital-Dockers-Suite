@@ -6,15 +6,17 @@ const MessageSchema = new mongoose.Schema({
         required: true,
         index: true
     },
-    author: {
-        type: String, // Username or User ID? Using username/author name for simplicity as per socket data
+    sender: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
         required: true
+    },
+    recipient: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null // null for general/room messages
     },
     message: {
-        type: String,
-        required: true
-    },
-    time: {
         type: String,
         required: true
     },

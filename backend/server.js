@@ -39,20 +39,22 @@ io.on('connection', (socket) => {
     });
 
     socket.on('send_message', async (data) => {
-        // data = { room, author, message, time, ... }
+        // data = { room, sender (user object), message, recipient }
         // Broadcast to room
         socket.to(data.room).emit('receive_message', data);
 
-        // Save to DB
-        try {
-            await Message.create({
-                room: data.room,
-                author: data.author,
-                message: data.message,
-                time: data.time
-            });
-        } catch (error) {
-            console.error('Error saving message:', error);
+        // Save to DB - only if sender has _id
+        if (data.sender && data.sender._id) {
+            try {
+                await Message.create({
+                    room: data.room,
+                    sender: data.sender._id,
+                    message: data.message,
+                    recipient: data.recipient || null
+                });
+            } catch (error) {
+                console.error('Error saving message:', error);
+            }
         }
     });
 

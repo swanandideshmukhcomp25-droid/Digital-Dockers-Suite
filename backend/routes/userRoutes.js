@@ -8,9 +8,12 @@ router.use(protect);
 
 router.get('/org-tree', getOrgTree);
 
+// Allow all authenticated users to get user list (needed for chat)
+router.get('/', getUsers);
+
+// Admin-only routes
 router.use(admin);
 
-router.get('/', getUsers);
 router.put('/:id/role', updateUserRole);
 
 module.exports = router;
