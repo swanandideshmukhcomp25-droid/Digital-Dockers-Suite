@@ -4,7 +4,7 @@ import {
     Typography, Paper, CircularProgress, Chip, Box, Button
 } from '@mui/material';
 import { VideoCall, Schedule, Add } from '@mui/icons-material';
-import { format, isPast, isFuture } from 'date-fns';
+import { format, isFuture } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';

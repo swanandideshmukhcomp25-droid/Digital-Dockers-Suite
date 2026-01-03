@@ -25,15 +25,13 @@ const MeetingsPage = () => {
     const [transcriptDialogOpen, setTranscriptDialogOpen] = useState(false);
     const [transcriptText, setTranscriptText] = useState('');
     const [expandedMeeting, setExpandedMeeting] = useState(null);
-    const [googleCalendarConnected, setGoogleCalendarConnected] = useState(false);
     const navigate = useNavigate();
 
     const canScheduleMeetings = ['admin', 'project_manager', 'technical_lead', 'marketing_lead'].includes(user?.role);
 
     useEffect(() => {
         fetchMeetings();
-        // Check if user has Google Calendar connected
-        setGoogleCalendarConnected(!!user?.googleAccessToken);
+         
     }, [user]);
 
     const fetchMeetings = async () => {
@@ -82,7 +80,7 @@ const MeetingsPage = () => {
             setTranscriptDialogOpen(false);
             setTranscriptText('');
             fetchMeetings();
-        } catch (error) {
+        } catch {
             toast.error('Failed to add transcript');
         }
     };

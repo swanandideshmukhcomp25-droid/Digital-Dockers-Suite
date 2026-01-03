@@ -7,6 +7,7 @@ import {
 } from '@mui/material';
 import { Email, Lock, Visibility, VisibilityOff, Business, ArrowForward } from '@mui/icons-material';
 import { toast } from 'react-toastify';
+// eslint-disable-next-line no-unused-vars
 import { motion } from 'framer-motion';
 import GlassCard from '../components/common/GlassCard';
 

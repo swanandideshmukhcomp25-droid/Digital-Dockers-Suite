@@ -98,6 +98,11 @@ app.use('/api/calendar', require('./routes/calendarRoutes'));
 app.use('/api/chat', require('./routes/chatRoutes'));
 app.use('/api/insights', require('./routes/insightsRoutes'));
 app.use('/api/rag', require('./routes/ragRoutes'));
+app.use('/api/projects', require('./routes/projectRoutes'));
+app.use('/api/sprints', require('./routes/sprintRoutes'));
+app.use('/api/epics', require('./routes/epicRoutes'));
+app.use('/api/activity', require('./routes/activityRoutes'));
+app.use('/api/chatbot', require('./routes/chatbotRoutes'));
 
 const { errorHandler } = require('./middlewares/errorMiddleware');
 app.use(errorHandler);

@@ -105,7 +105,7 @@ const SettingsPage = () => {
             const res = await api.get('/auth/google/calendar/auth');
             // Redirect user to Google OAuth
             window.location.href = res.data.authUrl;
-        } catch (error) {
+        } catch {
             toast.error('Failed to initiate Google Calendar connection');
             setCalendarLoading(false);
         }
@@ -120,7 +120,7 @@ const SettingsPage = () => {
             await api.post('/auth/google/calendar/disconnect');
             setGoogleCalendarConnected(false);
             toast.success('Google Calendar disconnected');
-        } catch (error) {
+        } catch {
             toast.error('Failed to disconnect Google Calendar');
         } finally {
             setCalendarLoading(false);

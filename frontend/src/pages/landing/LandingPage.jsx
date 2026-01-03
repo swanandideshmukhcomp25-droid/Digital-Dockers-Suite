@@ -1,6 +1,7 @@
 import { Box, Button, Container, Grid, Typography, useTheme, useMediaQuery, AppBar, Toolbar } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { Edit, Chat, People, ArrowForward, Business } from '@mui/icons-material';
+// eslint-disable-next-line no-unused-vars
 import { motion, useScroll, useTransform } from 'framer-motion';
 import GlassCard from '../../components/common/GlassCard';
 

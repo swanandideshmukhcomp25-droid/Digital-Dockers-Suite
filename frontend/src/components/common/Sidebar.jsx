@@ -1,170 +1,141 @@
+import { Layout, Menu, theme, Drawer, Grid } from 'antd';
 import {
-    Drawer, List, ListItem, ListItemIcon, ListItemText,
-    Box, Toolbar, Divider, ListItemButton
-} from '@mui/material';
-import {
-    Dashboard, Assignment, Description, Email,
-    BarChart, FitnessCenter, RecordVoiceOver, People, Settings, Chat
-} from '@mui/icons-material';
+    ProjectOutlined,
+    UnorderedListOutlined, // Board
+    CalendarOutlined,
+    TeamOutlined,
+    FileTextOutlined,
+    SettingOutlined,
+    DashboardOutlined,
+    MessageOutlined, // Chat vs Meetings
+    ApartmentOutlined,
+    HeartOutlined,
+    InboxOutlined,
+    BarChartOutlined,
+} from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { useThemeMode } from '../../context/ThemeContext';
+import { useState } from 'react';
 
-const drawerWidth = 240;
+const { Sider } = Layout;
+const { useBreakpoint } = Grid;
 
-const Sidebar = ({ mobileOpen, handleDrawerToggle }) => {
-    const { user } = useAuth();
-    const { mode } = useThemeMode();
+const Sidebar = ({ mobileOpen, setMobileOpen, collapsed }) => {
     const navigate = useNavigate();
     const location = useLocation();
+    const { user } = useAuth();
+    const screens = useBreakpoint();
 
-    // ... menuItems ...
-    const menuItems = [
-        { text: 'Dashboard', icon: <Dashboard />, path: '/dashboard', roles: ['all'] },
-        { text: 'Tasks', icon: <Assignment />, path: '/dashboard/tasks', roles: ['project_manager', 'technical_lead', 'technical_team', 'marketing_team'] },
-        { text: 'Meetings', icon: <RecordVoiceOver />, path: '/dashboard/meetings', roles: ['project_manager', 'technical_lead', 'technical_team', 'marketing_team'] },
-        { text: 'Emails', icon: <Email />, path: '/dashboard/emails', roles: ['project_manager', 'marketing_team', 'marketing_lead'] },
-        { text: 'Reports', icon: <BarChart />, path: '/dashboard/reports', roles: ['project_manager', 'marketing_lead', 'admin'] },
-        { text: 'Documents', icon: <Description />, path: '/dashboard/documents', roles: ['technical_team', 'marketing_team'] },
-        { text: 'Chat', icon: <Chat />, path: '/dashboard/chat', roles: ['all'] },
-        { text: 'Organization', icon: <People />, path: '/dashboard/organization', roles: ['all'] },
-        { text: 'Wellness', icon: <FitnessCenter />, path: '/dashboard/wellness', roles: ['all'] },
-    ];
+    // State for hover-expand on tablet
+    const [hoverExpanded, setHoverExpanded] = useState(false);
 
-    const hasAccess = (itemRoles) => {
-        if (itemRoles.includes('all')) return true;
-        if (user?.role === 'admin') return true;
-        return itemRoles.includes(user?.role);
+    const {
+        token: { colorBgContainer, colorBorderSecondary },
+    } = theme.useToken();
+
+    // Determine current sidebar state based on breakpoints
+    const isMobile = !screens.md; // < 768px
+
+    // On tablet (md && !xl), default to collapsed (icon only)
+    // On desktop (xl), default to full
+    // But we let parent control 'collapsed' state for persistence if needed.
+    // Ideally update 'collapsed' based on breakpoint changes, but simple logic here:
+
+    const effectiveCollapsed = isMobile ? false : (collapsed || (!screens.xl && !hoverExpanded));
+
+    const hasAccess = (roles) => {
+        if (!roles || roles.includes('all')) return true;
+        return roles.includes(user?.role) || user?.role === 'admin';
     };
 
-    const drawerContent = (
-        <>
-            <Toolbar sx={{ minHeight: '56px !important' }} />
-            <Box sx={{ overflow: 'auto', pt: 2 }}>
-                <List sx={{ px: 1 }}>
-                    {menuItems.map((item) => (
-                        hasAccess(item.roles) && (
-                            <ListItemButton
-                                key={item.text}
-                                onClick={() => {
-                                    navigate(item.path);
-                                    if (mobileOpen) handleDrawerToggle();
-                                }}
-                                selected={location.pathname === item.path}
-                                sx={{
-                                    borderRadius: 1,
-                                    mb: 0.5,
-                                    '&.Mui-selected': {
-                                        backgroundColor: mode === 'light' ? '#DEEBFF' : '#1C2B41',
-                                        color: mode === 'light' ? '#0052CC' : '#579DFF',
-                                        '& .MuiListItemIcon-root': {
-                                            color: mode === 'light' ? '#0052CC' : '#579DFF',
-                                        },
-                                        '&:hover': {
-                                            backgroundColor: mode === 'light' ? '#B3D4FF' : '#2C3E5D',
-                                        },
-                                    },
-                                    '&:hover': {
-                                        backgroundColor: mode === 'light' ? '#EBECF0' : '#282E33',
-                                    },
-                                }}
-                            >
-                                <ListItemIcon
-                                    sx={{
-                                        minWidth: 40,
-                                        color: location.pathname === item.path ? '#0052CC' : '#5E6C84',
-                                    }}
-                                >
-                                    {item.icon}
-                                </ListItemIcon>
-                                <ListItemText
-                                    primary={item.text}
-                                    primaryTypographyProps={{
-                                        fontSize: '0.875rem',
-                                        fontWeight: location.pathname === item.path ? 600 : 400,
-                                    }}
-                                />
-                            </ListItemButton>
-                        )
-                    ))}
-                </List>
-                <Divider sx={{ my: 2, mx: 2 }} />
-                <List sx={{ px: 1 }}>
-                    <ListItemButton
-                        onClick={() => navigate('/dashboard/settings')}
-                        sx={{
-                            borderRadius: 1,
-                            '&:hover': {
-                                backgroundColor: '#EBECF0',
-                            },
-                        }}
-                    >
-                        <ListItemIcon sx={{ minWidth: 40, color: '#5E6C84' }}>
-                            <Settings />
-                        </ListItemIcon>
-                        <ListItemText
-                            primary="Settings"
-                            primaryTypographyProps={{
-                                fontSize: '0.875rem',
-                            }}
-                        />
-                    </ListItemButton>
-                </List>
-            </Box>
-        </>
+    const items = [
+        {
+            key: 'project-group',
+            label: 'PROJECT: PLATFORM',
+            type: 'group',
+            children: [
+                { key: '/dashboard', icon: <DashboardOutlined />, label: 'Summary' },
+                { key: '/dashboard/tasks', icon: <UnorderedListOutlined />, label: 'Board' },
+                { key: '/dashboard/backlog', icon: <InboxOutlined />, label: 'Backlog' },
+                { key: '/dashboard/roadmap', icon: <CalendarOutlined />, label: 'Roadmap' },
+                { key: '/dashboard/reports', icon: <BarChartOutlined />, label: 'Reports' },
+            ]
+        },
+        { type: 'divider' },
+        {
+            key: 'global-group',
+            label: 'APPS',
+            type: 'group',
+            children: [
+                { key: '/dashboard/meetings', icon: <MessageOutlined />, label: 'Meetings', hidden: !hasAccess(['project_manager', 'technical_lead']) },
+                { key: '/dashboard/documents', icon: <FileTextOutlined />, label: 'Documents' },
+                { key: '/dashboard/chat', icon: <MessageOutlined />, label: 'Chat' },
+                { key: '/dashboard/organization', icon: <ApartmentOutlined />, label: 'Team' },
+                { key: '/dashboard/wellness', icon: <HeartOutlined />, label: 'Wellness' },
+            ].filter(item => !item.hidden)
+        },
+        { type: 'divider' },
+        { key: '/dashboard/settings', icon: <SettingOutlined />, label: 'Settings' }
+    ];
+
+    const MenuContent = (
+        <Menu
+            mode="inline"
+            defaultSelectedKeys={[location.pathname]}
+            selectedKeys={[location.pathname]}
+            style={{ borderRight: 0, height: '100%' }}
+            items={items}
+            onClick={({ key }) => {
+                navigate(key);
+                if (isMobile) setMobileOpen(false);
+            }}
+        />
     );
 
-    return (
-        <Box component="nav" sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}>
-            {/* Mobile Drawer */}
+    // Mobile Drawer
+    if (isMobile) {
+        return (
             <Drawer
-                variant="temporary"
+                placement="left"
+                onClose={() => setMobileOpen(false)}
                 open={mobileOpen}
-                onClose={handleDrawerToggle}
-                ModalProps={{ keepMounted: true }}
-                sx={{
-                    display: { xs: 'block', sm: 'none' },
-                    '& .MuiDrawer-paper': {
-                        boxSizing: 'border-box',
-                        width: drawerWidth,
-                        borderRight: '1px solid rgba(255,255,255,0.1)',
-                        backdropFilter: 'blur(12px)',
-                        background: (theme) => theme.palette.mode === 'light'
-                            ? 'rgba(255, 255, 255, 0.95)'
-                            : 'rgba(30, 41, 59, 0.95)',
-                    },
-                }}
+                width={280}
+                bodyStyle={{ padding: 0 }}
+                headerStyle={{ display: 'none' }} // Hide mock header in drawer
             >
-                {drawerContent}
+                <div style={{ padding: '24px 24px 0', marginBottom: 24 }}>
+                    <div style={{ fontSize: 18, fontWeight: 'bold', color: '#0052CC' }}>Digital Dockers</div>
+                </div>
+                {MenuContent}
             </Drawer>
-            {/* Desktop Drawer */}
-            <Drawer
-                variant="permanent"
-                sx={{
-                    display: { xs: 'none', sm: 'block' },
-                    width: drawerWidth,
-                    flexShrink: 0,
-                    [`& .MuiDrawer-paper`]: {
-                        width: drawerWidth - 20, // Floating width
-                        margin: '10px',
-                        height: 'calc(100% - 20px)',
-                        borderRadius: '16px',
-                        boxSizing: 'border-box',
-                        backgroundColor: 'transparent',
-                        borderRight: 'none',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        backdropFilter: 'blur(12px)',
-                        boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)',
-                        background: (theme) => theme.palette.mode === 'light'
-                            ? 'rgba(255, 255, 255, 0.75)'
-                            : 'rgba(30, 41, 59, 0.75)',
-                    },
-                }}
-                open
-            >
-                {drawerContent}
-            </Drawer>
-        </Box>
+        );
+    }
+
+    // Desktop/Tablet Sider
+    return (
+        <Sider
+            trigger={null}
+            collapsible
+            collapsed={effectiveCollapsed && !hoverExpanded}
+            width={240}
+            collapsedWidth={80}
+            onMouseEnter={() => !screens.xl && setHoverExpanded(true)}
+            onMouseLeave={() => setHoverExpanded(false)}
+            style={{
+                background: colorBgContainer,
+                borderRight: `1px solid ${colorBorderSecondary}`,
+                overflowX: 'hidden',
+                overflowY: 'auto',
+                height: 'calc(100vh - 60px)',
+                position: 'fixed',
+                left: 0,
+                top: 60,
+                zIndex: 900,
+                transition: 'all 0.2s'
+            }}
+        >
+            {MenuContent}
+        </Sider>
     );
 };
 

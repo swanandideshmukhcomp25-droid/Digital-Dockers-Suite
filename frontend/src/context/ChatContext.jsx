@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 
 const ChatContext = createContext();
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useChat = () => useContext(ChatContext);
 
 export const ChatProvider = ({ children }) => {
@@ -15,6 +16,7 @@ export const ChatProvider = ({ children }) => {
     useEffect(() => {
         if (user) {
             const newSocket = io('http://localhost:5000');
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setSocket(newSocket);
 
             newSocket.on('connect', () => {

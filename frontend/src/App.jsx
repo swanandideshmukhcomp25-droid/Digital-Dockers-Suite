@@ -13,6 +13,8 @@ import DashboardLayout from './components/common/DashboardLayout';
 import DashboardHome from './components/dashboards/DashboardHome';
 import NotFoundPage from './pages/NotFoundPage';
 import TaskBoard from './components/tasks/TaskBoard';
+import Backlog from './components/work/Backlog';
+import Roadmap from './components/work/Roadmap';
 import MeetingsPage from './components/meetings/MeetingsPage';
 import EmailGenerator from './components/email/EmailGenerator';
 import DocumentManager from './components/documents/DocumentManager';
@@ -21,8 +23,10 @@ import ReportDashboard from './components/reports/ReportDashboard';
 import SettingsPage from './pages/settings/SettingsPage';
 import ProfilePage from './pages/profile/ProfilePage';
 import { ChatProvider } from './context/ChatContext';
+import { ProjectProvider } from './context/ProjectContext';
 import ChatPage from './components/chat/ChatPage';
 import OrgGraph from './components/org/OrgGraph';
+import ProjectsListPage from './pages/ProjectsListPage';
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children, roles = [] }) => {
@@ -47,40 +51,46 @@ function App() {
       <CssBaseline />
       <AuthProvider>
         <ChatProvider>
-          <Router>
-            <Routes>
-              {/* Public Routes */}
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
-              <Route path="/auth/google/callback" element={<GoogleCallback />} />
+          <ProjectProvider>
+            <Router>
+              <Routes>
+                {/* ... existing routes ... */}
+                {/* Public Routes */}
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+                <Route path="/auth/google/callback" element={<GoogleCallback />} />
 
-              {/* Protected Dashboard Routes */}
-              <Route path="/dashboard" element={
-                <ProtectedRoute>
-                  <DashboardLayout />
-                </ProtectedRoute>
-              }>
-                {/* Dashboard Main View - redirect based on role */}
-                <Route index element={<DashboardHome />} />
+                {/* Protected Dashboard Routes */}
+                <Route path="/dashboard" element={
+                  <ProtectedRoute>
+                    <DashboardLayout />
+                  </ProtectedRoute>
+                }>
+                  {/* Dashboard Main View - redirect based on role */}
+                  <Route index element={<DashboardHome />} />
 
-                {/* Feature Routes */}
-                <Route path="tasks" element={<TaskBoard />} />
-                <Route path="meetings" element={<MeetingsPage />} />
-                <Route path="emails" element={<EmailGenerator />} />
-                <Route path="documents" element={<DocumentManager />} />
-                <Route path="wellness" element={<WellnessCheckin />} />
-                <Route path="reports" element={<ReportDashboard />} />
-                <Route path="settings" element={<SettingsPage />} />
-                <Route path="profile" element={<ProfilePage />} />
-                <Route path="chat" element={<ChatPage />} />
-                <Route path="organization" element={<OrgGraph />} />
-              </Route>
+                  {/* Feature Routes */}
+                  <Route path="tasks" element={<TaskBoard />} />
+                  <Route path="backlog" element={<Backlog />} />
+                  <Route path="roadmap" element={<Roadmap />} />
+                  <Route path="meetings" element={<MeetingsPage />} />
+                  <Route path="emails" element={<EmailGenerator />} />
+                  <Route path="documents" element={<DocumentManager />} />
+                  <Route path="wellness" element={<WellnessCheckin />} />
+                  <Route path="reports" element={<ReportDashboard />} />
+                  <Route path="settings" element={<SettingsPage />} />
+                  <Route path="profile" element={<ProfilePage />} />
+                  <Route path="chat" element={<ChatPage />} />
+                  <Route path="organization" element={<OrgGraph />} />
+                  <Route path="projects" element={<ProjectsListPage />} />
+                </Route>
 
-              {/* Fallback */}
-              <Route path="*" element={<NotFoundPage />} />
-            </Routes>
-          </Router>
+                {/* Fallback */}
+                <Route path="*" element={<NotFoundPage />} />
+              </Routes>
+            </Router>
+          </ProjectProvider>
         </ChatProvider>
       </AuthProvider>
       <ToastContainer position="top-right" />

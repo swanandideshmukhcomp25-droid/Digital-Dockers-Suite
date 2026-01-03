@@ -74,7 +74,7 @@ const AdminDashboard = () => {
 
             toast.success('User role updated successfully');
             setEditingUserId(null);
-        } catch (error) {
+        } catch {
             toast.error('Failed to update role');
         }
     };

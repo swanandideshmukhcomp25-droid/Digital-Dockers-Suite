@@ -23,6 +23,7 @@ const DocumentManager = () => {
     };
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         fetchDocuments();
     }, []);
 
@@ -36,7 +37,7 @@ const DocumentManager = () => {
 
         try {
             // Send with multipart/form-data (axios auto-sets this for FormData)
-            const res = await api.post('/documents/upload', formData, {
+            await api.post('/documents/upload', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data'
                 }

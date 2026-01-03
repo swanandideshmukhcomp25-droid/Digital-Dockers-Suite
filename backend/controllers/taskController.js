@@ -7,40 +7,66 @@ const { createTaskCalendarEvent, updateTaskCalendarEvent, deleteTaskCalendarEven
 // @desc    Create new task
 // @route   POST /api/tasks
 // @access  Private (Leaders/Admins only)
-const createTask = asyncHandler(async (req, res) => {
-    const { title, description, deadline, assignedTo, priority } = req.body;
+const Project = require('../models/Project'); // Add Project import
 
-    // Authorization - only leaders and admins can create tasks
-    const authorizedRoles = ['admin', 'project_manager', 'technical_lead', 'marketing_lead'];
-    if (!authorizedRoles.includes(req.user.role)) {
-        res.status(403);
-        throw new Error('Not authorized to create tasks');
-    }
+// @desc    Create new task
+// @route   POST /api/tasks
+// @access  Private
+const createTask = asyncHandler(async (req, res) => {
+    const {
+        title, description, deadline, assignedTo, priority,
+        projectId, sprintId, epicId, issueType, storyPoints, parentTaskId, status
+    } = req.body;
 
     if (!title) {
         res.status(400);
         throw new Error('Please add a task title');
     }
 
-    // AI Analysis
-    const aiAnalysis = await analyzeTask(description, deadline);
+    // Generate Issue Key if Project ID is provided
+    let issueKey = undefined;
+    if (projectId) {
+        const project = await Project.findByIdAndUpdate(
+            projectId,
+            { $inc: { nextIssueNumber: 1 } },
+            { new: true }
+        );
+        if (project) {
+            issueKey = `${project.key}-${project.nextIssueNumber - 1}`;
+        }
+    }
+
+    // AI Analysis (keep existing feature)
+    const aiAnalysis = await analyzeTask(description || title, deadline);
 
     const task = await Task.create({
         title,
         description,
         priority: priority || aiAnalysis.priority || 'medium',
-        status: 'todo',
+        status: status || 'todo',
         assignedTo: assignedTo || [req.user._id],
         assignedBy: req.user._id,
+        reporter: req.user._id,
         dueDate: deadline,
+
+        // Jira Fields
+        key: issueKey,
+        project: projectId,
+        sprint: sprintId,
+        epic: epicId,
+        issueType: issueType || 'task',
+        storyPoints: storyPoints,
+        parentTask: parentTaskId,
+
         aiSuggestions: {
-            timeBreakdown: aiAnalysis.timeBreakdown,
-            dependencies: aiAnalysis.dependencies
+            timeBreakdown: aiAnalysis?.timeBreakdown,
+            dependencies: aiAnalysis?.dependencies
         }
     });
 
-    // Google Calendar Integration - Create calendar events for assigned users
+    // Google Calendar Integration
     if (task.dueDate && task.assignedTo && task.assignedTo.length > 0) {
+        // ... (Keep existing calendar logic) ...
         for (const userId of task.assignedTo) {
             try {
                 const user = await User.findById(userId);
@@ -67,55 +93,91 @@ const createTask = asyncHandler(async (req, res) => {
                         }
                     }
 
-                    // Create calendar event
-                    const eventId = await createTaskCalendarEvent(accessToken, {
-                        title: task.title,
-                        description: task.description,
-                        dueDate: task.dueDate
-                    });
+                    // Create calendar event - safe check
+                    try {
+                        const eventId = await createTaskCalendarEvent(accessToken, {
+                            title: task.key ? `[${task.key}] ${task.title}` : task.title,
+                            description: task.description,
+                            dueDate: task.dueDate
+                        });
 
-                    // Store event ID in task (we'll store first successfully created event)
-                    if (!task.calendarEventId) {
-                        task.calendarEventId = eventId;
-                        await task.save();
+                        if (!task.calendarEventId) {
+                            task.calendarEventId = eventId;
+                            await task.save();
+                        }
+
+                        console.log(`✅ Calendar event created for user ${user.fullName}`);
+                    } catch (calErr) {
+                        console.error(`Calendar API Error: ${calErr.message}`);
                     }
-
-                    console.log(`✅ Calendar event created for user ${user.fullName}`);
                 }
             } catch (error) {
                 console.error(`Failed to create calendar event for user ${userId}:`, error.message);
-                // Continue even if calendar sync fails for one user
             }
         }
     }
 
-    await task.populate('assignedTo', 'fullName email');
-    await task.populate('assignedBy', 'fullName email');
+    await task.populate([
+        { path: 'assignedTo', select: 'fullName email' },
+        { path: 'assignedBy', select: 'fullName email' },
+        { path: 'project' },
+        { path: 'sprint' },
+        { path: 'epic' }
+    ]);
 
     res.status(201).json(task);
 });
 
-// @desc    Get all tasks
+// @desc    Get all tasks (with filters)
 // @route   GET /api/tasks
 // @access  Private
 const getTasks = asyncHandler(async (req, res) => {
-    let query = {
-        $or: [{ assignedTo: req.user._id }, { assignedBy: req.user._id }]
-    };
+    const { projectId, sprintId, epicId, status, assignedTo } = req.query;
 
-    // Allow Admin and Leaders to see all tasks
-    const fullAccessRoles = ['admin', 'Project Manager', 'Technical Lead'];
-    if (fullAccessRoles.includes(req.user.role)) {
-        query = {}; // No filter, return all
+    let query = {};
+
+    // Specific filters
+    if (projectId) query.project = projectId;
+    if (sprintId) query.sprint = sprintId;
+    if (epicId) query.epic = epicId;
+    if (status) query.status = status;
+    if (assignedTo) query.assignedTo = assignedTo;
+
+    // If no specific project/sprint filters, apply default visibility rules
+    // (Leaders see all, users see theirs, UNLESS they are viewing a specific project board they have access to)
+    // For now, if projectId is NOT provided, fallback to "My Tasks" or "Admin View"
+    if (!projectId && !sprintId && !epicId) {
+        const fullAccessRoles = ['admin', 'project_manager', 'technical_lead', 'marketing_lead']; // Normalized roles
+
+        // simple role check (case insensitive mostly safe but strict here)
+        const userRole = req.user.role;
+
+        if (!['admin', 'Project Manager', 'Technical Lead'].includes(userRole)) {
+            // Regular user -> Only show assigned or reported
+            query.$or = [
+                { assignedTo: req.user._id },
+                { assignedBy: req.user._id },
+                { reporter: req.user._id }
+            ];
+        }
     }
 
     const tasks = await Task.find(query)
         .populate('assignedTo', 'fullName email')
         .populate('assignedBy', 'fullName')
+        .populate('project', 'name key icon')
+        .populate('sprint', 'name status')
+        .populate('epic', 'name color')
         .sort('-createdAt');
 
     res.status(200).json(tasks);
 });
+
+// @desc    Update task
+// @route   PUT /api/tasks/:id
+// @access  Private
+const { canTransition } = require('./workflowController');
+const automationService = require('../services/automationService');
 
 // @desc    Update task
 // @route   PUT /api/tasks/:id
@@ -133,21 +195,70 @@ const updateTask = asyncHandler(async (req, res) => {
     const isAssignee = task.assignedTo.some(id => id.toString() === req.user._id.toString());
     const isAdmin = req.user.role === 'admin';
 
+    // Relaxed perms for demo: any project member should be able to update?
+    // For now, keep strict:
     if (!isCreator && !isAssignee && !isAdmin) {
         res.status(403);
         throw new Error('Not authorized to update this task');
     }
 
-    // Update task fields
+    // Workflow Validation
+    if (req.body.status && req.body.status !== task.status) {
+        if (!canTransition(task.status, req.body.status)) {
+            res.status(400);
+            throw new Error(`Invalid transition from ${task.status} to ${req.body.status}`);
+        }
+    }
+
+    // Track History & Applied Changes
+    const changes = {};
+    const historyEntry = {
+        updatedBy: req.user._id,
+        timestamp: new Date()
+    };
+    let hasChanges = false;
+
+    // Monitor specific fields
+    const monitoredFields = ['status', 'priority', 'assignedTo', 'description', 'storyPoints', 'sprint'];
+    monitoredFields.forEach(field => {
+        if (req.body[field] !== undefined && JSON.stringify(req.body[field]) !== JSON.stringify(task[field])) {
+            // For simplicity, just log string changes. For objects/arrays, simpler logging:
+            const oldValue = typeof task[field] === 'object' ? JSON.stringify(task[field]) : task[field];
+            const newValue = typeof req.body[field] === 'object' ? JSON.stringify(req.body[field]) : req.body[field];
+
+            task.history.push({
+                ...historyEntry,
+                field,
+                oldValue: String(oldValue),
+                newValue: String(newValue)
+            });
+            changes[field] = req.body[field];
+            hasChanges = true;
+        }
+    });
+
+    // Special handling for Status Completion
+    if (req.body.status === 'done' && task.status !== 'done') {
+        task.completedAt = new Date();
+        req.body.completedAt = task.completedAt;
+    }
+
+    // Apply updates
     const updatedTask = await Task.findByIdAndUpdate(
         req.params.id,
         req.body,
         { new: true, runValidators: true }
     ).populate('assignedTo', 'fullName email')
-        .populate('assignedBy', 'fullName email');
+        .populate('assignedBy', 'fullName email')
+        .populate('history.updatedBy', 'fullName');
+
+    if (hasChanges) {
+        automationService.emit('issue:updated', updatedTask, changes);
+    }
 
     // Google Calendar Integration - Update calendar event if dueDate changed
     if (req.body.dueDate && task.dueDate && task.calendarEventId) {
+        // ... (Keep existing calendar logic for update)
         const oldDate = new Date(task.dueDate).getTime();
         const newDate = new Date(req.body.dueDate).getTime();
 
@@ -163,7 +274,6 @@ const updateTask = asyncHandler(async (req, res) => {
                             description: updatedTask.description,
                             dueDate: updatedTask.dueDate
                         });
-                        console.log(`✅ Calendar event updated for user ${user.fullName}`);
                     }
                 } catch (error) {
                     console.error(`Failed to update calendar event:`, error.message);
@@ -172,23 +282,32 @@ const updateTask = asyncHandler(async (req, res) => {
         }
     }
 
-    // If task status changed to completed, optionally delete calendar event
-    if (req.body.status === 'completed' && task.calendarEventId) {
-        for (const userId of updatedTask.assignedTo) {
-            try {
-                const user = await User.findById(userId._id || userId);
+    res.status(200).json(updatedTask);
+});
 
-                if (user && user.googleAccessToken) {
-                    await deleteTaskCalendarEvent(user.googleAccessToken, task.calendarEventId);
-                    console.log(`✅ Calendar event deleted for completed task`);
-                }
-            } catch (error) {
-                console.error(`Failed to delete calendar event:`, error.message);
-            }
-        }
+// @desc    Add comment to task
+// @route   POST /api/tasks/:id/comments
+// @access  Private
+const addComment = asyncHandler(async (req, res) => {
+    const task = await Task.findById(req.params.id);
+    if (!task) {
+        res.status(404);
+        throw new Error('Task not found');
     }
 
-    res.status(200).json(updatedTask);
+    const comment = {
+        user: req.user._id,
+        text: req.body.text,
+        timestamp: new Date()
+    };
+
+    task.comments.push(comment);
+    await task.save();
+
+    const updatedTask = await Task.findById(req.params.id)
+        .populate('comments.user', 'fullName avatar');
+
+    res.status(201).json(updatedTask.comments);
 });
 
 // @desc    Delete task
@@ -232,9 +351,63 @@ const deleteTask = asyncHandler(async (req, res) => {
     res.status(200).json({ message: 'Task deleted successfully', id: req.params.id });
 });
 
+// @desc    Get tasks assigned to current user
+// @route   GET /api/tasks/assigned-to-me
+// @access  Private
+const getAssignedToMe = asyncHandler(async (req, res) => {
+    const { limit = 10 } = req.query;
+
+    const tasks = await Task.find({
+        assignedTo: req.user._id,
+        status: { $ne: 'done' }
+    })
+        .populate('project', 'name key')
+        .sort({ priority: -1, updatedAt: -1 })
+        .limit(parseInt(limit));
+
+    res.json(tasks);
+});
+
+// @desc    Global search across tasks and projects
+// @route   GET /api/tasks/search
+// @access  Private
+const globalSearch = asyncHandler(async (req, res) => {
+    const { query } = req.query;
+
+    if (!query || query.length < 2) {
+        return res.json({ tasks: [], projects: [] });
+    }
+
+    const searchRegex = new RegExp(query, 'i');
+
+    const tasks = await Task.find({
+        $or: [
+            { key: searchRegex },
+            { title: searchRegex },
+            { description: searchRegex }
+        ]
+    })
+        .populate('project', 'name key')
+        .populate('assignedTo', 'fullName')
+        .limit(10);
+
+    const Project = require('../models/Project');
+    const projects = await Project.find({
+        $or: [
+            { key: searchRegex },
+            { name: searchRegex }
+        ]
+    }).limit(5);
+
+    res.json({ tasks, projects });
+});
+
 module.exports = {
     createTask,
     getTasks,
     updateTask,
-    deleteTask
+    deleteTask,
+    addComment,
+    getAssignedToMe,
+    globalSearch
 };

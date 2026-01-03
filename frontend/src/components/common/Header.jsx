@@ -1,141 +1,300 @@
-import { AppBar, Toolbar, Typography, Box, Avatar, IconButton, Menu, MenuItem, Switch, FormControlLabel } from '@mui/material';
+import { useState, useCallback, useEffect } from 'react';
+import { Layout, Button, Input, Avatar, Dropdown, Space, Typography, theme, Grid, List, Tag, Spin, Empty } from 'antd';
+import {
+    SearchOutlined,
+    QuestionCircleOutlined,
+    SettingOutlined,
+    AppstoreOutlined,
+    DownOutlined,
+    PlusOutlined,
+    LogoutOutlined,
+    UserOutlined,
+    MenuOutlined
+} from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useThemeMode } from '../../context/ThemeContext';
-import { useNavigate } from 'react-router-dom';
-import { AccountCircle, Notifications, Help, Apps, DarkMode, LightMode, Menu as MenuIcon } from '@mui/icons-material';
-import { useState } from 'react';
+import { useProject } from '../../context/ProjectContext';
+import CreateModal from './CreateModal';
+import NotificationsDropdown from './NotificationsDropdown';
+import searchService from '../../services/searchService';
+import debounce from 'lodash/debounce';
 
-const Header = ({ handleDrawerToggle }) => {
+const { Header: AntHeader } = Layout;
+const { Text } = Typography;
+const { useBreakpoint } = Grid;
+
+const Header = ({ onMenuClick }) => {
     const { user, logout } = useAuth();
     const { mode, toggleTheme } = useThemeMode();
+    const { projects, switchProject, currentProject } = useProject();
     const navigate = useNavigate();
-    const [anchorEl, setAnchorEl] = useState(null);
+    const screens = useBreakpoint();
+    const isMobile = !screens.md;
 
-    const handleMenu = (event) => {
-        setAnchorEl(event.currentTarget);
-    };
+    // Roles that can create tasks
+    const canCreate = ['admin', 'project_manager', 'technical_lead', 'marketing_lead'].includes(user?.role);
 
-    const handleClose = () => {
-        setAnchorEl(null);
-    };
+    const [createModalOpen, setCreateModalOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState({ tasks: [], projects: [] });
+    const [searchLoading, setSearchLoading] = useState(false);
+    const [searchOpen, setSearchOpen] = useState(false);
+
+    const {
+        token: { colorBgContainer, colorBorderSecondary },
+    } = theme.useToken();
 
     const handleLogout = () => {
-        handleClose();
         logout();
         navigate('/login');
     };
 
-    const handleProfile = () => {
-        handleClose();
-        navigate('/dashboard/profile');
+    // Debounced search function
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const debouncedSearch = useCallback(
+        debounce(async (query) => {
+            if (query.length < 2) {
+                setSearchResults({ tasks: [], projects: [] });
+                return;
+            }
+            setSearchLoading(true);
+            try {
+                const results = await searchService.globalSearch(query);
+                setSearchResults(results);
+            } catch (error) {
+                console.error('Search failed:', error);
+            } finally {
+                setSearchLoading(false);
+            }
+        }, 300),
+        []
+    );
+
+    useEffect(() => {
+        debouncedSearch(searchQuery);
+    }, [searchQuery, debouncedSearch]);
+
+    const handleSearchChange = (e) => {
+        setSearchQuery(e.target.value);
+        setSearchOpen(true);
     };
 
+    const handleSearchResultClick = (item, type) => {
+        setSearchOpen(false);
+        setSearchQuery('');
+        if (type === 'task') {
+            // Navigate to backlog or open issue detail
+            navigate('/dashboard/backlog');
+        } else if (type === 'project') {
+            switchProject(item._id);
+            navigate('/dashboard');
+        }
+    };
+
+    const userMenu = [
+        {
+            key: 'profile',
+            label: (
+                <div style={{ padding: '8px 0' }}>
+                    <Text strong>{user?.fullName}</Text>
+                    <br />
+                    <Text type="secondary" style={{ fontSize: '12px' }}>{user?.email}</Text>
+                </div>
+            ),
+        },
+        { type: 'divider' },
+        { key: 'profile-page', icon: <UserOutlined />, label: 'Profile', onClick: () => navigate('/dashboard/profile') },
+        { key: 'settings', icon: <SettingOutlined />, label: 'Settings', onClick: () => navigate('/dashboard/settings') },
+        { key: 'theme', label: mode === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode', onClick: toggleTheme },
+        { type: 'divider' },
+        { key: 'logout', icon: <LogoutOutlined />, label: 'Log out', onClick: handleLogout, danger: true },
+    ];
+
+    const projectMenu = [
+        {
+            key: 'recent',
+            type: 'group',
+            label: 'Recent Projects',
+            children: projects.slice(0, 5).map(p => ({
+                key: p._id,
+                label: `${p.name} (${p.key})`,
+                onClick: () => {
+                    switchProject(p._id);
+                    navigate('/dashboard');
+                }
+            }))
+        },
+        { type: 'divider' },
+        { key: 'view-all', label: 'View all projects', onClick: () => navigate('/dashboard/projects') }
+    ];
+
+    const searchDropdownContent = (
+        <div style={{
+            width: 400,
+            maxHeight: 400,
+            overflow: 'auto',
+            backgroundColor: '#fff',
+            borderRadius: 8,
+            boxShadow: '0 6px 16px rgba(0,0,0,0.12)',
+            padding: 8
+        }}>
+            {searchLoading ? (
+                <div style={{ padding: 40, textAlign: 'center' }}>
+                    <Spin />
+                </div>
+            ) : searchResults.tasks.length > 0 || searchResults.projects.length > 0 ? (
+                <>
+                    {searchResults.tasks.length > 0 && (
+                        <>
+                            <Text type="secondary" style={{ padding: '8px 12px', display: 'block' }}>Issues</Text>
+                            <List
+                                size="small"
+                                dataSource={searchResults.tasks}
+                                renderItem={(item) => (
+                                    <List.Item
+                                        style={{ padding: '8px 12px', cursor: 'pointer' }}
+                                        onClick={() => handleSearchResultClick(item, 'task')}
+                                    >
+                                        <Space>
+                                            <Tag color="blue">{item.key}</Tag>
+                                            <Text ellipsis style={{ maxWidth: 250 }}>{item.title}</Text>
+                                        </Space>
+                                    </List.Item>
+                                )}
+                            />
+                        </>
+                    )}
+                    {searchResults.projects.length > 0 && (
+                        <>
+                            <Text type="secondary" style={{ padding: '8px 12px', display: 'block' }}>Projects</Text>
+                            <List
+                                size="small"
+                                dataSource={searchResults.projects}
+                                renderItem={(item) => (
+                                    <List.Item
+                                        style={{ padding: '8px 12px', cursor: 'pointer' }}
+                                        onClick={() => handleSearchResultClick(item, 'project')}
+                                    >
+                                        <Space>
+                                            <Tag color="purple">{item.key}</Tag>
+                                            <Text>{item.name}</Text>
+                                        </Space>
+                                    </List.Item>
+                                )}
+                            />
+                        </>
+                    )}
+                </>
+            ) : searchQuery.length >= 2 ? (
+                <Empty description="No results found" style={{ padding: 40 }} />
+            ) : null}
+        </div>
+    );
+
     return (
-        <AppBar
-            position="fixed"
-            sx={{
-                zIndex: (theme) => theme.zIndex.drawer + 1,
-                backgroundColor: mode === 'light' ? '#FFFFFF' : '#282E33',
-                color: mode === 'light' ? '#172B4D' : '#B6C2CF',
-                boxShadow: mode === 'light'
-                    ? '0px 1px 0px rgba(9, 30, 66, 0.13)'
-                    : '0px 1px 0px rgba(0, 0, 0, 0.3)',
-                width: { sm: `calc(100% - ${240}px)` },
-                ml: { sm: `${240}px` },
-            }}
-        >
-            <Toolbar sx={{ minHeight: '56px !important' }}>
-                <IconButton
-                    color="inherit"
-                    aria-label="open drawer"
-                    edge="start"
-                    onClick={handleDrawerToggle}
-                    sx={{ mr: 2, display: { sm: 'none' } }}
-                >
-                    <MenuIcon />
-                </IconButton>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Apps sx={{ color: '#0052CC', fontSize: 28 }} />
-                    <Typography
-                        variant="h6"
-                        noWrap
-                        component="div"
-                        sx={{
-                            fontWeight: 600,
-                            fontSize: '1.25rem',
-                        }}
+        <>
+            <AntHeader
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: isMobile ? '0 16px' : '0 20px',
+                    background: colorBgContainer,
+                    borderBottom: `1px solid ${colorBorderSecondary}`,
+                    height: 60,
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 1000,
+                }}
+            >
+                {/* Left: Logo & Nav */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 12 : 24 }}>
+                    {isMobile && (
+                        <Button
+                            type="text"
+                            icon={<MenuOutlined />}
+                            onClick={onMenuClick}
+                            style={{ fontSize: 18 }}
+                        />
+                    )}
+
+                    <div
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
+                        onClick={() => navigate('/dashboard')}
                     >
-                        Digital Dockers
-                    </Typography>
-                </Box>
+                        <AppstoreOutlined style={{ fontSize: 24, color: '#0052CC' }} />
+                        {!isMobile && <Text strong style={{ fontSize: 18, color: '#172B4D' }}>Digital Dockers</Text>}
+                    </div>
 
-                <Box sx={{ flexGrow: 1 }} />
+                    {!isMobile && (
+                        <Space size="middle">
+                            <Dropdown menu={{ items: projectMenu }} trigger={['click']}>
+                                <Button type="text">
+                                    {currentProject?.name || 'Projects'} <DownOutlined style={{ fontSize: 10 }} />
+                                </Button>
+                            </Dropdown>
+                            {screens.lg && (
+                                <>
+                                    <Button type="text" onClick={() => navigate('/dashboard/backlog')}>Backlog</Button>
+                                    <Button type="text" onClick={() => navigate('/dashboard/tasks')}>Board</Button>
+                                    <Button type="text" onClick={() => navigate('/dashboard/organization')}>People</Button>
+                                </>
+                            )}
+                            {canCreate && (
+                                <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateModalOpen(true)}>
+                                    Create
+                                </Button>
+                            )}
+                        </Space>
+                    )}
+                </div>
 
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <IconButton onClick={toggleTheme} size="medium">
-                        {mode === 'dark' ? <LightMode /> : <DarkMode />}
-                    </IconButton>
-                    <IconButton size="medium">
-                        <Help />
-                    </IconButton>
-                    <IconButton size="medium">
-                        <Notifications />
-                    </IconButton>
-
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 1 }}>
-                        <Avatar
-                            sx={{
-                                bgcolor: '#0052CC',
-                                width: 32,
-                                height: 32,
-                                fontSize: '0.875rem',
-                                cursor: 'pointer',
-                                '&:hover': {
-                                    bgcolor: '#0747A6',
-                                }
-                            }}
-                            onClick={handleMenu}
+                {/* Right: Search & Profile */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 16 }}>
+                    {isMobile ? (
+                        <Button type="text" icon={<SearchOutlined />} />
+                    ) : (
+                        <Dropdown
+                            dropdownRender={() => searchDropdownContent}
+                            trigger={['click']}
+                            open={searchOpen && searchQuery.length >= 2}
+                            onOpenChange={(open) => !open && setSearchOpen(false)}
                         >
-                            {user?.fullName?.[0]}
-                        </Avatar>
-                        <Menu
-                            anchorEl={anchorEl}
-                            open={Boolean(anchorEl)}
-                            onClose={handleClose}
-                            PaperProps={{
-                                sx: {
-                                    mt: 1,
-                                    minWidth: 200,
-                                    boxShadow: mode === 'light'
-                                        ? '0px 4px 8px rgba(9, 30, 66, 0.2)'
-                                        : '0px 4px 8px rgba(0, 0, 0, 0.5)',
-                                }
-                            }}
-                        >
-                            <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
-                                <Typography variant="body2" fontWeight={600}>
-                                    {user?.fullName}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                    {user?.email}
-                                </Typography>
-                            </Box>
-                            <MenuItem onClick={handleProfile}>Profile</MenuItem>
-                            <MenuItem onClick={() => { handleClose(); navigate('/dashboard/settings'); }}>Settings</MenuItem>
-                            <Box sx={{ px: 2, py: 1 }}>
-                                <FormControlLabel
-                                    control={<Switch checked={mode === 'dark'} onChange={toggleTheme} size="small" />}
-                                    label={<Typography variant="body2">Dark Mode</Typography>}
+                            <Input
+                                placeholder="Search issues and projects"
+                                prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
+                                style={{ width: screens.lg ? 240 : 180, borderRadius: 4 }}
+                                value={searchQuery}
+                                onChange={handleSearchChange}
+                                onFocus={() => setSearchOpen(true)}
+                                allowClear
+                            />
+                        </Dropdown>
+                    )}
+
+                    <Space size={isMobile ? 'small' : 'large'}>
+                        {!isMobile && (
+                            <>
+                                <NotificationsDropdown />
+                                <QuestionCircleOutlined
+                                    style={{ fontSize: 20, cursor: 'pointer', color: '#6B778C' }}
+                                    onClick={() => window.open('https://support.atlassian.com/jira-software-cloud/', '_blank')}
                                 />
-                            </Box>
-                            <Box sx={{ borderTop: '1px solid', borderColor: 'divider', mt: 1 }}>
-                                <MenuItem onClick={handleLogout}>Log out</MenuItem>
-                            </Box>
-                        </Menu>
-                    </Box>
-                </Box>
-            </Toolbar>
-        </AppBar>
+                            </>
+                        )}
+
+                        <Dropdown menu={{ items: userMenu }} trigger={['click']} placement="bottomRight">
+                            <Avatar style={{ backgroundColor: '#0052CC', cursor: 'pointer' }} icon={<UserOutlined />}>
+                                {user?.fullName?.[0]}
+                            </Avatar>
+                        </Dropdown>
+                    </Space>
+                </div>
+            </AntHeader>
+
+            <CreateModal open={createModalOpen} onClose={() => setCreateModalOpen(false)} />
+        </>
     );
 };
 

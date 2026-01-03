@@ -15,7 +15,7 @@ const CalendarView = () => {
             try {
                 const res = await api.get('/calendar/auth');
                 setAuthUrl(res.data.url);
-            } catch (e) {
+            } catch {
                 // console.log("Auth not needed or failed");
             }
         };

@@ -23,6 +23,7 @@ const DocumentAnalysisDrawer = ({ open, onClose, documentId, documentTitle }) =>
             setChatHistory([]);
             setQuestion('');
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, documentId]);
 
     const fetchAnalysis = async () => {
@@ -50,7 +51,7 @@ const DocumentAnalysisDrawer = ({ open, onClose, documentId, documentTitle }) =>
         try {
             const res = await api.post(`/rag/chat/${documentId}`, { question: currentQ });
             setChatHistory(prev => [...prev, { role: 'assistant', content: res.data.answer }]);
-        } catch (error) {
+        } catch {
             setChatHistory(prev => [...prev, { role: 'assistant', content: 'Error getting answer.' }]);
         } finally {
             setChatLoading(false);
