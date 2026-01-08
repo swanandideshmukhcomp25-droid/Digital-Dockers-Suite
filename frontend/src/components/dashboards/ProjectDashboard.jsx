@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Row, Col, Card, Typography, List, Avatar, Progress, Tag, Spin, Empty, message } from 'antd';
-import { RiseOutlined, FireOutlined, CheckCircleOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { Row, Col, Card, Typography, List, Avatar, Progress, Tag, Spin, Empty, message, Alert } from 'antd';
+import { RiseOutlined, FireOutlined, CheckCircleOutlined, ClockCircleOutlined, BulbOutlined, WarningOutlined, CheckOutlined } from '@ant-design/icons';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, PointElement, LineElement } from 'chart.js';
 import { Doughnut, Line } from 'react-chartjs-2';
 import { useProject } from '../../context/ProjectContext';
@@ -8,6 +8,14 @@ import projectStatsService from '../../services/projectStatsService';
 import activityService from '../../services/activityService';
 import searchService from '../../services/searchService';
 import { formatDistanceToNow } from 'date-fns';
+import { generateSprintInsights } from '../../utils/aiInsights';
+import ForYouSection from './ForYouSection';
+import RecentActivityPanel from './RecentActivityPanel';
+import UpcomingWorkCard from './UpcomingWorkCard';
+import StatusOverview from './StatusOverview';
+import AIInsightBanner from './AIInsightBanner';
+import { generateMockForYouData, generateMockActivityData, generateMockUpcomingTasks } from '../../utils/mockDashboardData';
+import './dashboard.css';
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, PointElement, LineElement);
 
@@ -20,6 +28,11 @@ const ProjectDashboard = () => {
     const [burndownData, setBurndownData] = useState(null);
     const [recentActivity, setRecentActivity] = useState([]);
     const [assignedToMe, setAssignedToMe] = useState([]);
+    const [sprintInsights, setSprintInsights] = useState(null);
+    // New state for Jira-style features
+    const [forYouData, setForYouData] = useState(null);
+    const [activityData, setActivityData] = useState([]);
+    const [upcomingData, setUpcomingData] = useState(null);
 
     useEffect(() => {
         if (currentProject?._id) {
@@ -41,6 +54,21 @@ const ProjectDashboard = () => {
             setStats(statsData);
             setRecentActivity(activityData);
             setAssignedToMe(assignedData);
+
+            // Generate AI insights based on stats
+            if (statsData && statsData.activeSprint) {
+                const insights = generateSprintInsights(statsData, statsData.activeSprint);
+                setSprintInsights(insights);
+            }
+
+            // Load mock data for Jira-style features
+            const forYouMockData = generateMockForYouData();
+            const activityMockData = generateMockActivityData();
+            const upcomingMockData = generateMockUpcomingTasks();
+
+            setForYouData(forYouMockData);
+            setActivityData(activityMockData);
+            setUpcomingData(upcomingMockData);
 
             // Load burndown if there's an active sprint
             if (statsData.activeSprint?._id) {
@@ -101,165 +129,286 @@ const ProjectDashboard = () => {
 
     if (loading) {
         return (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-                <Spin size="large" />
+            <div className="dashboard-loading">
+                <Spin size="large" tip="Loading dashboard..." />
             </div>
         );
     }
 
     return (
-        <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-            <div style={{ marginBottom: 24 }}>
-                <Title level={3}>Project Overview: {currentProject?.name || 'No Project Selected'}</Title>
-                <Text type="secondary">
-                    Lead: {currentProject?.lead?.fullName || 'N/A'} • Key: {currentProject?.key} • Type: {currentProject?.projectType || 'Scrum'}
-                </Text>
+        <div className="dashboard-container">
+            {/* Header */}
+            <div className="dashboard-header">
+                <Title level={2}>Project Overview: {currentProject?.name || 'No Project Selected'}</Title>
+                <Typography.Text type="secondary">
+                    <span>Lead: {currentProject?.lead?.fullName || 'N/A'}</span>
+                    <span>•</span>
+                    <span>Key: {currentProject?.key}</span>
+                    <span>•</span>
+                    <span>Type: {currentProject?.projectType || 'Scrum'}</span>
+                </Typography.Text>
             </div>
 
-            <Row gutter={[24, 24]}>
-                {/* Top Metrics */}
-                <Col span={24}>
-                    <Row gutter={[16, 16]}>
-                        <Col xs={24} sm={12} lg={6}>
-                            <Card bordered={false} hoverable bodyStyle={{ padding: 16 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                                    <FireOutlined style={{ fontSize: 24, color: '#ff5630' }} />
-                                    <div>
-                                        <Text type="secondary">Sprint Progress</Text>
-                                        <Title level={4} style={{ margin: 0 }}>{stats?.sprintProgress || 0}% Done</Title>
-                                    </div>
-                                </div>
+            {/* AI Insight Banner */}
+            {stats && <div className="dashboard-alert"><AIInsightBanner stats={stats} assignedTasks={assignedToMe} upcomingTasks={upcomingData?.upcomingTasks} /></div>}
+
+            {/* For You Section */}
+            {forYouData && (
+                <div className="for-you-section">
+                    <div className="for-you-title">👤 For You</div>
+                    <ForYouSection
+                        assignedIssues={forYouData.assignedIssues}
+                        recentlyViewed={forYouData.recentlyViewed}
+                        recentlyUpdated={forYouData.recentlyUpdated}
+                    />
+                </div>
+            )}
+
+            {/* KPI Metrics Section */}
+            <Row gutter={[16, 16]} style={{ marginBottom: 32 }}>
+                <Col xs={24} sm={12} lg={6}>
+                    <div className="kpi-card">
+                        <div className="kpi-icon" style={{ color: '#ff5630' }}>
+                            <FireOutlined />
+                        </div>
+                        <div className="kpi-content">
+                            <div className="kpi-label">Sprint Progress</div>
+                            <div className="kpi-value">{stats?.sprintProgress || 0}%</div>
+                            <div className="kpi-progress">
                                 <Progress
                                     percent={stats?.sprintProgress || 0}
                                     showInfo={false}
                                     strokeColor="#ff5630"
                                     size="small"
-                                    style={{ marginTop: 8 }}
                                 />
-                            </Card>
-                        </Col>
-                        <Col xs={24} sm={12} lg={6}>
-                            <Card bordered={false} hoverable bodyStyle={{ padding: 16 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                                    <CheckCircleOutlined style={{ fontSize: 24, color: '#00875a' }} />
-                                    <div>
-                                        <Text type="secondary">Issues Done</Text>
-                                        <Title level={4} style={{ margin: 0 }}>{stats?.issuesDone || 0}</Title>
-                                    </div>
-                                </div>
-                            </Card>
-                        </Col>
-                        <Col xs={24} sm={12} lg={6}>
-                            <Card bordered={false} hoverable bodyStyle={{ padding: 16 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                                    <ClockCircleOutlined style={{ fontSize: 24, color: '#FFAB00' }} />
-                                    <div>
-                                        <Text type="secondary">Days Remaining</Text>
-                                        <Title level={4} style={{ margin: 0 }}>{stats?.daysRemaining || 0} Days</Title>
-                                    </div>
-                                </div>
-                            </Card>
-                        </Col>
-                        <Col xs={24} sm={12} lg={6}>
-                            <Card bordered={false} hoverable bodyStyle={{ padding: 16 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                                    <RiseOutlined style={{ fontSize: 24, color: '#0052cc' }} />
-                                    <div>
-                                        <Text type="secondary">Velocity</Text>
-                                        <Title level={4} style={{ margin: 0 }}>{stats?.velocity || 0} Pts</Title>
-                                    </div>
-                                </div>
-                            </Card>
-                        </Col>
-                    </Row>
+                            </div>
+                        </div>
+                    </div>
                 </Col>
+                <Col xs={24} sm={12} lg={6}>
+                    <div className="kpi-card">
+                        <div className="kpi-icon" style={{ color: '#00875a' }}>
+                            <CheckCircleOutlined />
+                        </div>
+                        <div className="kpi-content">
+                            <div className="kpi-label">Issues Done</div>
+                            <div className="kpi-value">{stats?.issuesDone || 0}</div>
+                            <div style={{ fontSize: 12, color: '#626f86', marginTop: 8 }}>
+                                of {stats?.totalTasks || 0} total
+                            </div>
+                        </div>
+                    </div>
+                </Col>
+                <Col xs={24} sm={12} lg={6}>
+                    <div className="kpi-card">
+                        <div className="kpi-icon" style={{ color: '#ffab00' }}>
+                            <ClockCircleOutlined />
+                        </div>
+                        <div className="kpi-content">
+                            <div className="kpi-label">Days Remaining</div>
+                            <div className="kpi-value">{stats?.daysRemaining || 0}</div>
+                            <div style={{ fontSize: 12, color: '#626f86', marginTop: 8 }}>
+                                in sprint
+                            </div>
+                        </div>
+                    </div>
+                </Col>
+                <Col xs={24} sm={12} lg={6}>
+                    <div className="kpi-card">
+                        <div className="kpi-icon" style={{ color: '#0052cc' }}>
+                            <RiseOutlined />
+                        </div>
+                        <div className="kpi-content">
+                            <div className="kpi-label">Velocity</div>
+                            <div className="kpi-value">{stats?.velocity || 0}</div>
+                            <div style={{ fontSize: 12, color: '#626f86', marginTop: 8 }}>
+                                points/day
+                            </div>
+                        </div>
+                    </div>
+                </Col>
+            </Row>
+
+            <Row gutter={[24, 24]} style={{ marginBottom: 32 }}>
+                {/* AI Sprint Insights Card */}
+                {sprintInsights && (
+                    <Col span={24}>
+                        <Card
+                            title={
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <BulbOutlined style={{ color: '#FFAB00' }} />
+                                    <span>AI Sprint Insights</span>
+                                </div>
+                            }
+                            variant="borderless"
+                        >
+                            <Row gutter={[24, 24]}>
+                                {/* Risks Section */}
+                                {sprintInsights.risks?.length > 0 && (
+                                    <Col xs={24} md={12}>
+                                        <div style={{ marginBottom: 16 }}>
+                                            <Title level={5}>⚠️ Detected Risks</Title>
+                                            {sprintInsights.risks.map((risk, idx) => (
+                                                <Alert
+                                                    key={idx}
+                                                    title={risk.title}
+                                                    description={risk.description}
+                                                    type={risk.level === 'critical' ? 'error' : risk.level === 'high' ? 'warning' : 'info'}
+                                                    showIcon
+                                                    style={{ marginBottom: 12 }}
+                                                />
+                                            ))}
+                                        </div>
+                                    </Col>
+                                )}
+
+                                {/* Recommendations Section */}
+                                {sprintInsights.recommendations?.length > 0 && (
+                                    <Col xs={24} md={12}>
+                                        <div>
+                                            <Title level={5}>💡 Recommendations</Title>
+                                            {sprintInsights.recommendations.map((rec, idx) => (
+                                                <div
+                                                    key={idx}
+                                                    style={{
+                                                        padding: '12px 16px',
+                                                        backgroundColor: rec.priority === 'high' ? '#fff7e6' : '#f6f8fb',
+                                                        borderLeft: `4px solid ${rec.priority === 'high' ? '#ff7a45' : '#0052cc'}`,
+                                                        marginBottom: 12,
+                                                        borderRadius: 4
+                                                    }}
+                                                >
+                                                    <Text strong>{rec.action}</Text>
+                                                    <div style={{ fontSize: 12, color: '#626f86', marginTop: 4 }}>
+                                                        {rec.detail}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </Col>
+                                )}
+
+                                {/* Insights Section */}
+                                {sprintInsights.insights?.length > 0 && (
+                                    <Col span={24}>
+                                        <div>
+                                            <Title level={5}>✨ Key Insights</Title>
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                                                {sprintInsights.insights.map((insight, idx) => (
+                                                    <div
+                                                        key={idx}
+                                                        style={{
+                                                            padding: '12px 16px',
+                                                            backgroundColor: '#f0f5ff',
+                                                            border: '1px solid #b3d8ff',
+                                                            borderRadius: 6,
+                                                            flex: '1 1 calc(50% - 6px)',
+                                                            minWidth: 200
+                                                        }}
+                                                    >
+                                                        <CheckOutlined style={{ color: '#00875a', marginRight: 8 }} />
+                                                        <Text>{insight.emoji} {insight.text}</Text>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </Col>
+                                )}
+                            </Row>
+                        </Card>
+                    </Col>
+                )}
 
                 {/* Main Content: Charts & Activity */}
                 <Col xs={24} lg={16}>
-                    <Card title="Sprint Burndown" bordered={false} style={{ marginBottom: 24 }}>
-                        <div style={{ height: 300 }}>
-                            {burndownChartData ? (
-                                <Line data={burndownChartData} options={{ maintainAspectRatio: false }} />
-                            ) : (
-                                <Empty description="No active sprint" />
-                            )}
+                    <div className="chart-card" style={{ marginBottom: 24 }}>
+                        <div className="ant-card-head">
+                            <Typography.Text strong>📈 Sprint Burndown</Typography.Text>
                         </div>
-                    </Card>
+                        <div className="ant-card-body">
+                            <div style={{ height: 320 }}>
+                                {burndownChartData ? (
+                                    <Line data={burndownChartData} options={{ maintainAspectRatio: false }} />
+                                ) : (
+                                    <Empty description="No active sprint" />
+                                )}
+                            </div>
+                        </div>
+                    </div>
                     <Row gutter={[24, 24]}>
                         <Col xs={24} md={12}>
-                            <Card title="Issue Status" bordered={false}>
-                                <div style={{ height: 200, display: 'flex', justifyContent: 'center' }}>
-                                    {statusChartData ? (
-                                        <Doughnut data={statusChartData} options={{ maintainAspectRatio: false }} />
-                                    ) : (
-                                        <Empty description="No data" />
-                                    )}
+                            <div className="chart-card">
+                                <div className="ant-card-head">
+                                    <Typography.Text strong>🎯 Issue Status</Typography.Text>
                                 </div>
-                            </Card>
+                                <div className="ant-card-body">
+                                    <div className="chart-container">
+                                        {statusChartData ? (
+                                            <Doughnut data={statusChartData} options={{ maintainAspectRatio: false }} />
+                                        ) : (
+                                            <Empty description="No data" />
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
                         </Col>
                         <Col xs={24} md={12}>
-                            <Card title="Workload" bordered={false}>
-                                <div style={{ height: 200, overflow: 'auto' }}>
-                                    {stats?.workload?.length > 0 ? (
-                                        <List
-                                            size="small"
-                                            dataSource={stats.workload}
-                                            renderItem={(item) => (
-                                                <List.Item>
-                                                    <List.Item.Meta
-                                                        avatar={<Avatar style={{ backgroundColor: '#0052cc' }}>{item.name?.[0]}</Avatar>}
-                                                        title={item.name}
-                                                        description={`${item.points} points`}
-                                                    />
-                                                </List.Item>
-                                            )}
-                                        />
-                                    ) : (
-                                        <Empty description="No workload data" />
-                                    )}
+                            <div className="chart-card">
+                                <div className="ant-card-head">
+                                    <Typography.Text strong>👥 Team Workload</Typography.Text>
                                 </div>
-                            </Card>
+                                <div className="ant-card-body">
+                                    <div style={{ maxHeight: 250, overflowY: 'auto' }}>
+                                        {stats?.workload?.length > 0 ? (
+                                            <List
+                                                size="small"
+                                                dataSource={stats.workload}
+                                                renderItem={(item) => (
+                                                    <List.Item style={{ paddingBottom: 12 }}>
+                                                        <List.Item.Meta
+                                                            avatar={<Avatar style={{ backgroundColor: '#0052cc' }}>{item.name?.[0]}</Avatar>}
+                                                            title={<Typography.Text strong>{item.name}</Typography.Text>}
+                                                            description={
+                                                                <div style={{ marginTop: 4 }}>
+                                                                    <Tag color="blue">{item.points} points</Tag>
+                                                                </div>
+                                                            }
+                                                        />
+                                                    </List.Item>
+                                                )}
+                                            />
+                                        ) : (
+                                            <Empty description="No workload data" />
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
                         </Col>
                     </Row>
                 </Col>
 
                 <Col xs={24} lg={8}>
-                    <Card title="Recent Activity" bordered={false} style={{ marginBottom: 24 }}>
-                        {recentActivity.length > 0 ? (
-                            <List
-                                itemLayout="horizontal"
-                                dataSource={recentActivity}
-                                renderItem={(item) => (
-                                    <List.Item>
-                                        <List.Item.Meta
-                                            avatar={<Avatar style={{ backgroundColor: '#0052cc' }}>{item.actor?.fullName?.[0] || '?'}</Avatar>}
-                                            title={<Text strong>{item.message}</Text>}
-                                            description={formatTimeAgo(item.createdAt)}
-                                        />
-                                    </List.Item>
-                                )}
+                    {/* Status Overview */}
+                    {stats && (
+                        <div style={{ marginBottom: 24 }}>
+                            <StatusOverview stats={stats} />
+                        </div>
+                    )}
+
+                    {/* Upcoming & Unscheduled Work */}
+                    {upcomingData && (
+                        <div style={{ marginBottom: 24 }}>
+                            <UpcomingWorkCard
+                                upcomingTasks={upcomingData.upcomingTasks}
+                                unscheduledTasks={upcomingData.unscheduledTasks}
                             />
-                        ) : (
-                            <Empty description="No recent activity" />
-                        )}
-                    </Card>
-                    <Card title="Assigned to Me" bordered={false}>
-                        {assignedToMe.length > 0 ? (
-                            <List
-                                dataSource={assignedToMe}
-                                renderItem={(item) => (
-                                    <List.Item style={{ cursor: 'pointer' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                            <Tag color="blue">{item.key || 'TASK'}</Tag>
-                                            <Text ellipsis style={{ maxWidth: 180 }}>{item.title}</Text>
-                                        </div>
-                                    </List.Item>
-                                )}
-                            />
-                        ) : (
-                            <Empty description="No tasks assigned" />
-                        )}
-                    </Card>
+                        </div>
+                    )}
+
+                    {/* Activity Feed */}
+                    {activityData.length > 0 && (
+                        <RecentActivityPanel activities={activityData} />
+                    )}
                 </Col>
             </Row>
         </div>

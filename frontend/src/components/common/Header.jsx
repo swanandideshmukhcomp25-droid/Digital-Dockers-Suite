@@ -256,7 +256,7 @@ const Header = ({ onMenuClick }) => {
                         <Button type="text" icon={<SearchOutlined />} />
                     ) : (
                         <Dropdown
-                            dropdownRender={() => searchDropdownContent}
+                            popupRender={() => searchDropdownContent}
                             trigger={['click']}
                             open={searchOpen && searchQuery.length >= 2}
                             onOpenChange={(open) => !open && setSearchOpen(false)}

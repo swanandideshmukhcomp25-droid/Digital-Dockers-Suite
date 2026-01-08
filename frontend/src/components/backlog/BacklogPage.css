@@ -1,0 +1,15 @@
+.issue-row {
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+}
+
+.issue-row:hover {
+    background-color: #fafafa !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.issue-row.dragging {
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+}

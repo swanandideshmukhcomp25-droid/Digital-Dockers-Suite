@@ -1,33 +1,36 @@
 import { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { Card, Typography, Tag, Avatar, Space, Button, Empty, message, Select, Segmented, Grid, Tooltip } from 'antd';
-import { ClockCircleOutlined } from '@ant-design/icons';
+import { Card, Typography, Tag, Avatar, Space, Button, Empty, message, Select, Segmented, Grid, Tooltip, Input, Progress, Dropdown, Badge } from 'antd';
+import { ClockCircleOutlined, FilterOutlined, DownloadOutlined, PlusOutlined } from '@ant-design/icons';
 import { useProject } from '../../context/ProjectContext';
 import taskService from '../../services/taskService';
 import IssueDetailDrawer from '../work/IssueDetailDrawer';
+import CreateIssueModal from './CreateIssueModal';
+import './TaskBoard.css';
 
 const { Text, Title } = Typography;
 
 const COLUMNS = {
-    'todo': { title: 'To Do', status: 'todo' },
-    'in_progress': { title: 'In Progress', status: 'in_progress' },
-    'review': { title: 'In Review', status: 'review' },
-    'done': { title: 'Done', status: 'done' }
+    'todo': { title: 'Backlog', status: 'todo', color: '#f8f9fa', headerColor: '#626f86', bgColor: '#fafbfc' },
+    'in_progress': { title: 'In Progress', status: 'in_progress', color: '#f8f9fa', headerColor: '#0052cc', bgColor: '#deebff' },
+    'review': { title: 'In Review', status: 'review', color: '#f8f9fa', headerColor: '#ae2a19', bgColor: '#ffeceb' },
+    'done': { title: 'Done', status: 'done', color: '#f8f9fa', headerColor: '#216e4e', bgColor: '#dffcf0' }
 };
 
 const TaskBoard = () => {
     const { currentProject, activeSprint } = useProject();
-    // eslint-disable-next-line no-unused-vars
     const [issues, setIssues] = useState([]);
-    // eslint-disable-next-line no-unused-vars
     const [loading, setLoading] = useState(false);
     const [selectedIssue, setSelectedIssue] = useState(null);
     const [boardData, setBoardData] = useState({});
+    const [searchFilter, setSearchFilter] = useState('');
+    const [priorityFilter, setPriorityFilter] = useState('all');
 
     // Mobile View State
     const screens = Grid.useBreakpoint();
     const isMobile = !screens.md;
     const [mobileStatusFilter, setMobileStatusFilter] = useState('todo');
+    const [createModalOpen, setCreateModalOpen] = useState(false);
 
     useEffect(() => {
         if (currentProject && activeSprint) {
@@ -68,11 +71,34 @@ const TaskBoard = () => {
             if (grouped[status]) {
                 grouped[status].push(task);
             } else {
-                // Fallback for unknown status
                 grouped['todo'].push(task);
             }
         });
         setBoardData(grouped);
+    };
+
+    const getFilteredIssues = (columnIssues) => {
+        return columnIssues.filter(issue => {
+            const matchesSearch = issue.title.toLowerCase().includes(searchFilter.toLowerCase()) ||
+                                 issue.key.toLowerCase().includes(searchFilter.toLowerCase());
+            const matchesPriority = priorityFilter === 'all' || issue.priority === priorityFilter;
+            return matchesSearch && matchesPriority;
+        });
+    };
+
+    const getPriorityColor = (priority) => {
+        const priorityMap = {
+            'high': '#ff4d4f',
+            'medium': '#faad14',
+            'low': '#52c41a'
+        };
+        return priorityMap[priority] || '#d9d9d9';
+    };
+
+    const getProgressPercentage = () => {
+        const total = Object.values(boardData).flat().length;
+        const done = boardData['done']?.length || 0;
+        return total === 0 ? 0 : Math.round((done / total) * 100);
     };
 
     const handleDragEnd = async (result) => {
@@ -85,7 +111,7 @@ const TaskBoard = () => {
         ) return;
 
         const startStatus = source.droppableId;
-        const finishStatus = destination.droppableId; // This is the status key (e.g., 'in_progress')
+        const finishStatus = destination.droppableId;
 
         // Optimistic UI Update
         const newBoardData = { ...boardData };
@@ -100,9 +126,11 @@ const TaskBoard = () => {
         // API Call
         try {
             await taskService.updateTask(draggableId, { status: finishStatus });
-            message.success(`moved to ${COLUMNS[finishStatus].title}`);
-        } catch {
-            message.error('Failed to update status');
+            message.success(`Task moved to ${COLUMNS[finishStatus].title}`);
+        } catch (error) {
+            console.error('Failed to update task status:', error);
+            const errorMsg = error.response?.data?.message || error.message || 'Failed to update status';
+            message.error(errorMsg);
             loadSprintIssues(); // Revert
         }
     };
@@ -111,143 +139,172 @@ const TaskBoard = () => {
     if (!activeSprint) return <Empty description="No Active Sprint" />;
 
     return (
-        <div style={{ padding: isMobile ? '16px' : '0 24px', height: '100%' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24, alignItems: 'center' }}>
-                <div>
-                    <Title level={isMobile ? 4 : 3}>{activeSprint.name}</Title>
-                    <Text type="secondary">{currentProject.name} Board</Text>
+        <div className="kanban-board-container">
+            {/* Header Section */}
+            <div className="kanban-header">
+                <div className="header-left">
+                    <div className="header-title-section">
+                        <Title level={2} style={{ marginBottom: 4, marginTop: 0 }}>
+                            {currentProject.name}
+                        </Title>
+                        <div className="header-breadcrumb">
+                            <Text type="secondary">{activeSprint.name} • Board</Text>
+                        </div>
+                    </div>
                 </div>
                 {!isMobile && (
-                    <Space>
-                        <Select defaultValue="all" style={{ width: 120 }} options={[{ value: 'all', label: 'All Issues' }]} />
-                        <Button>Validations</Button>
-                    </Space>
+                    <div className="header-right">
+                        <Space size="middle">
+                            <span className="task-count-badge">
+                                <Text type="secondary">{Object.values(boardData).flat().length} issues</Text>
+                            </span>
+                            <Button 
+                                type="primary" 
+                                icon={<PlusOutlined />}
+                                onClick={() => setCreateModalOpen(true)}
+                            >
+                                Create Issue
+                            </Button>
+                        </Space>
+                    </div>
                 )}
             </div>
 
+            {/* Filters Section */}
+            <div className="kanban-filters">
+                <Input.Search
+                    placeholder="Search board"
+                    style={{ width: 250 }}
+                    value={searchFilter}
+                    onChange={(e) => setSearchFilter(e.target.value)}
+                    allowClear
+                />
+                <Select
+                    placeholder="Epic"
+                    style={{ width: 150 }}
+                    options={[
+                        { value: 'all', label: 'All Epics' },
+                        { value: 'frontend', label: 'Frontend' },
+                        { value: 'backend', label: 'Backend' }
+                    ]}
+                />
+                <Select
+                    placeholder="Type"
+                    style={{ width: 120 }}
+                    options={[
+                        { value: 'all', label: 'All Types' },
+                        { value: 'task', label: 'Task' },
+                        { value: 'bug', label: 'Bug' },
+                        { value: 'feature', label: 'Feature' }
+                    ]}
+                />
+                <Dropdown
+                    menu={{
+                        items: [
+                            { key: 'all', label: 'All' },
+                            { key: 'high', label: 'High Priority' },
+                            { key: 'medium', label: 'Medium Priority' },
+                            { key: 'low', label: 'Low Priority' }
+                        ],
+                        onClick: (e) => setPriorityFilter(e.key)
+                    }}
+                >
+                    <Button icon={<FilterOutlined />}>Quick filters</Button>
+                </Dropdown>
+            </div>
+
             {isMobile ? (
-                // MOBILE VIEW: Segmented Control + List
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                // MOBILE VIEW
+                <div className="kanban-mobile">
                     <Segmented
                         block
                         options={Object.keys(COLUMNS).map(key => ({
-                            label: COLUMNS[key].title,
+                            label: `${COLUMNS[key].title} (${getFilteredIssues(boardData[key] || []).length})`,
                             value: key
                         }))}
                         value={mobileStatusFilter}
                         onChange={setMobileStatusFilter}
                     />
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {(boardData[mobileStatusFilter] || []).map(issue => (
-                            <Card
+                    <div className="mobile-tasks-container">
+                        {getFilteredIssues(boardData[mobileStatusFilter] || []).map(issue => (
+                            <KanbanCard
                                 key={issue._id}
+                                issue={issue}
                                 onClick={() => setSelectedIssue(issue)}
-                                bodyStyle={{ padding: 12 }}
-                                bordered={true}
-                            >
-                                <Space direction="vertical" size={4} style={{ width: '100%' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <Text strong>{issue.title}</Text>
-                                        <Tag color="blue">{issue.key}</Tag>
-                                    </div>
-                                    <Space>
-                                        {/* Safe Access to priority */}
-                                        <Tag color={issue.priority === 'high' ? 'red' : 'orange'}>{issue.priority || 'Medium'}</Tag>
-                                        {issue.dueDate && (
-                                            <Tooltip title={`Due: ${new Date(issue.dueDate).toLocaleDateString()}`}>
-                                                <Tag
-                                                    icon={<ClockCircleOutlined />}
-                                                    color={new Date(issue.dueDate) < new Date() ? 'error' : 'default'}
-                                                >
-                                                    {new Date(issue.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                                </Tag>
-                                            </Tooltip>
-                                        )}
-                                        <Avatar size="small" style={{ backgroundColor: '#0052CC' }}>{issue.assignedTo?.[0]?.fullName?.[0] || 'U'}</Avatar>
-                                    </Space>
-                                </Space>
-                            </Card>
+                            />
                         ))}
-                        {(boardData[mobileStatusFilter] || []).length === 0 && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No issues" />}
+                        {getFilteredIssues(boardData[mobileStatusFilter] || []).length === 0 && (
+                            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No tasks" />
+                        )}
                     </div>
                 </div>
             ) : (
-                // DESKTOP VIEW: Drag & Drop Columns
+                // DESKTOP VIEW: Kanban Columns
                 <DragDropContext onDragEnd={handleDragEnd}>
-                    <div style={{ display: 'flex', gap: 24, overflowX: 'auto', height: 'calc(100vh - 200px)' }}>
-                        {Object.keys(COLUMNS).map(columnId => (
-                            <div key={columnId} style={{ minWidth: 280, width: 300, display: 'flex', flexDirection: 'column' }}>
-                                <div style={{ padding: '8px 4px', textTransform: 'uppercase', fontWeight: 600, color: '#5E6C84', fontSize: 12 }}>
-                                    {COLUMNS[columnId].title} {(boardData[columnId] || []).length}
-                                </div>
-                                <Droppable droppableId={columnId}>
-                                    {(provided, snapshot) => (
-                                        <div
-                                            {...provided.droppableProps}
-                                            ref={provided.innerRef}
-                                            style={{
-                                                background: snapshot.isDraggingOver ? '#e3f2fd' : '#f4f5f7',
-                                                padding: 8,
-                                                flexGrow: 1,
-                                                borderRadius: 4,
-                                                overflowY: 'auto'
-                                            }}
-                                        >
-                                            {(boardData[columnId] || []).map((issue, index) => (
-                                                <Draggable key={issue._id} draggableId={issue._id} index={index}>
-                                                    {(provided, snapshot) => (
-                                                        <div
-                                                            ref={provided.innerRef}
-                                                            {...provided.draggableProps}
-                                                            {...provided.dragHandleProps}
-                                                            onClick={() => setSelectedIssue(issue)}
-                                                            style={{
-                                                                userSelect: 'none',
-                                                                padding: 16,
-                                                                marginBottom: 8,
-                                                                background: 'white',
-                                                                borderRadius: 2,
-                                                                boxShadow: snapshot.isDragging ? '0 5px 10px rgba(0,0,0,0.15)' : '0 1px 2px rgba(0,0,0,0.1)',
-                                                                ...provided.draggableProps.style
-                                                            }}
-                                                        >
-                                                            <Space direction="vertical" size={4} style={{ width: '100%' }}>
-                                                                <Text>{issue.title}</Text>
-                                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                                    <Space>
-                                                                        <Tag color="blue">{issue.issueType.substring(0, 1).toUpperCase()}</Tag>
-                                                                        <Text type="secondary" style={{ fontSize: 12 }}>{issue.key}</Text>
-                                                                    </Space>
-                                                                    <Space>
-                                                                        {issue.priority === 'high' && <Tag color="red">High</Tag>}
-                                                                        {issue.dueDate && (
-                                                                            <Tooltip title={`Due: ${new Date(issue.dueDate).toLocaleString()}`}>
-                                                                                <Tag
-                                                                                    icon={<ClockCircleOutlined />}
-                                                                                    color={new Date(issue.dueDate) < new Date() ? 'error' : new Date(issue.dueDate).toDateString() === new Date().toDateString() ? 'warning' : 'default'}
-                                                                                    style={{ fontSize: 11 }}
-                                                                                >
-                                                                                    {new Date(issue.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                                                                </Tag>
-                                                                            </Tooltip>
-                                                                        )}
-                                                                        <Avatar size="small" style={{ fontSize: 10, backgroundColor: '#87d068' }}>
-                                                                            {issue.assignedTo?.[0]?.fullName?.[0] || 'U'}
-                                                                        </Avatar>
-                                                                    </Space>
-                                                                </div>
-                                                            </Space>
-                                                        </div>
-                                                    )}
-                                                </Draggable>
-                                            ))}
-                                            {provided.placeholder}
+                    <div className="kanban-board">
+                        {Object.keys(COLUMNS).map(columnId => {
+                            const filteredIssues = getFilteredIssues(boardData[columnId] || []);
+                            return (
+                                <div key={columnId} className="kanban-column">
+                                    {/* Column Header */}
+                                    <div
+                                        className="column-header"
+                                        style={{ borderTopColor: COLUMNS[columnId].headerColor }}
+                                    >
+                                        <div className="column-title">
+                                            <span className="column-name">{COLUMNS[columnId].title}</span>
+                                            <Badge 
+                                                count={filteredIssues.length} 
+                                                style={{ backgroundColor: COLUMNS[columnId].headerColor }}
+                                            />
                                         </div>
-                                    )}
-                                </Droppable>
-                            </div>
-                        ))}
+                                    </div>
+
+                                    {/* Tasks Container */}
+                                    <Droppable droppableId={columnId}>
+                                        {(provided, snapshot) => (
+                                            <div
+                                                {...provided.droppableProps}
+                                                ref={provided.innerRef}
+                                                className={`column-tasks ${snapshot.isDraggingOver ? 'dragging-over' : ''}`}
+                                                style={{
+                                                    backgroundColor: COLUMNS[columnId].color,
+                                                }}
+                                            >
+                                                {filteredIssues.map((issue, index) => (
+                                                    <Draggable
+                                                        key={issue._id}
+                                                        draggableId={issue._id}
+                                                        index={index}
+                                                    >
+                                                        {(provided, snapshot) => (
+                                                            <div
+                                                                ref={provided.innerRef}
+                                                                {...provided.draggableProps}
+                                                                {...provided.dragHandleProps}
+                                                                onClick={() => setSelectedIssue(issue)}
+                                                            >
+                                                                <KanbanCard
+                                                                    issue={issue}
+                                                                    isDragging={snapshot.isDragging}
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </Draggable>
+                                                ))}
+                                                {provided.placeholder}
+                                                {filteredIssues.length === 0 && (
+                                                    <div className="empty-column">
+                                                        <Text type="secondary">No tasks</Text>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </Droppable>
+                                </div>
+                            );
+                        })}
                     </div>
                 </DragDropContext>
             )}
@@ -257,9 +314,110 @@ const TaskBoard = () => {
                 issue={selectedIssue}
                 onClose={() => {
                     setSelectedIssue(null);
-                    loadSprintIssues(); // Refresh to catch any edit details
+                    loadSprintIssues();
                 }}
             />
+
+            <CreateIssueModal 
+                open={createModalOpen} 
+                onClose={() => setCreateModalOpen(false)}
+                onIssueCreated={() => {
+                    loadSprintIssues();
+                    setCreateModalOpen(false);
+                }}
+            />
+        </div>
+    );
+};
+
+// Kanban Card Component
+const KanbanCard = ({ issue, isDragging }) => {
+    const isOverdue = issue.dueDate && new Date(issue.dueDate) < new Date();
+
+    // Generate random color for the task key based on the issue ID
+    const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#87CEEB'];
+    const colorIndex = (issue._id?.charCodeAt(0) || 0) % colors.length;
+    const keyColor = colors[colorIndex];
+
+    return (
+        <div
+            className={`kanban-card ${isDragging ? 'dragging' : ''}`}
+            style={{
+                boxShadow: isDragging ? '0 5px 15px rgba(0,0,0,0.3)' : '0 1px 3px rgba(0,0,0,0.12)',
+            }}
+        >
+            {/* Card Key */}
+            <div className="card-key">
+                <span className="key-badge" style={{ backgroundColor: keyColor }}>
+                    {issue.key || `TASK-${issue._id?.slice(-4).toUpperCase()}`}
+                </span>
+            </div>
+
+            {/* Card Title */}
+            <div className="card-title">
+                <Text ellipsis={{ rows: 2, tooltip: true }} style={{ fontSize: 13, fontWeight: 500, color: '#262626' }}>
+                    {issue.title}
+                </Text>
+            </div>
+
+            {/* Card Labels/Tags */}
+            {issue.labels && issue.labels.length > 0 && (
+                <div className="card-labels">
+                    {issue.labels.slice(0, 2).map((label, idx) => (
+                        <Tag 
+                            key={idx} 
+                            style={{ 
+                                fontSize: 10, 
+                                backgroundColor: '#DCDCDC', 
+                                color: '#262626',
+                                border: 'none'
+                            }}
+                        >
+                            {label}
+                        </Tag>
+                    ))}
+                    {issue.labels.length > 2 && (
+                        <Tag style={{ fontSize: 10 }}>+{issue.labels.length - 2}</Tag>
+                    )}
+                </div>
+            )}
+
+            {/* Card Footer */}
+            <div className="card-footer">
+                <div className="footer-left">
+                    {issue.dueDate && (
+                        <Tooltip title={`Due: ${new Date(issue.dueDate).toLocaleDateString()}`}>
+                            <Tag
+                                icon={<ClockCircleOutlined />}
+                                color={isOverdue ? 'error' : 'default'}
+                                style={{ fontSize: 10, margin: 0, marginRight: 4 }}
+                            >
+                                {new Date(issue.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </Tag>
+                        </Tooltip>
+                    )}
+                </div>
+                <div className="footer-right">
+                    {issue.assignedTo && issue.assignedTo.length > 0 && (
+                        <Tooltip title={issue.assignedTo.map(u => u.fullName || u.name).join(', ')}>
+                            <Avatar.Group maxCount={2} size="small" style={{ marginLeft: 8 }}>
+                                {issue.assignedTo.map(assignee => (
+                                    <Avatar
+                                        key={assignee._id}
+                                        size="small"
+                                        style={{ 
+                                            backgroundColor: keyColor,
+                                            fontSize: 10
+                                        }}
+                                    >
+                                        {(assignee.fullName || assignee.name || 'U')?.[0]?.toUpperCase()}
+                                    </Avatar>
+                                ))}
+                            </Avatar.Group>
+                        </Tooltip>
+                    )}
+                </div>
+            </div>
         </div>
     );
 };
