@@ -293,7 +293,7 @@ const CreateModal = ({ open, onClose }) => {
             onCancel={onClose}
             footer={null}
             width={560}
-            destroyOnClose
+            destroyOnHidden
             centered
         >
             <Tabs

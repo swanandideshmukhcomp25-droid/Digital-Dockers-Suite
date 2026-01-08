@@ -1,4 +1,4 @@
-import { Drawer, Typography, Descriptions, Tag, Space, Avatar, Divider, Tabs, Button, Input, List, message, Select, Grid, Card, Timeline, Tooltip, Empty, Popconfirm } from 'antd';
+import { Drawer, Typography, Descriptions, Tag, Space, Avatar, Divider, Tabs, Button, Input, List, message, Select, Grid, Card, Timeline, Tooltip, Empty, Popconfirm, Spin, Modal } from 'antd';
 import {
     CloseOutlined,
     LinkOutlined,
@@ -10,9 +10,12 @@ import {
     CalendarOutlined,
     BranchesOutlined,
     DeleteOutlined,
-    ExclamationCircleOutlined
+    ExclamationCircleOutlined,
+    LoadingOutlined,
+    CheckOutlined,
+    RobotOutlined
 } from '@ant-design/icons';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import taskService from '../../services/taskService';
 import userService from '../../services/userService';
 import { useAuth } from '../../context/AuthContext';
@@ -21,17 +24,63 @@ const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
 const { useBreakpoint } = Grid;
 
+/**
+ * ============================================================================
+ * WORKFLOW VALIDATION & RULES
+ * ============================================================================
+ * Defines allowed status transitions for Jira-like workflow
+ */
+const WORKFLOW_RULES = {
+    'todo': ['in_progress'],
+    'in_progress': ['review', 'todo'],
+    'review': ['in_progress', 'done'],
+    'done': ['in_progress'] // Allow reopening
+};
+
+/**
+ * Validates if a status transition is allowed
+ */
+const isValidStatusTransition = (currentStatus, newStatus) => {
+    if (currentStatus === newStatus) return true;
+    return WORKFLOW_RULES[currentStatus]?.includes(newStatus) || false;
+};
+
+/**
+ * Formats relative time (e.g., "2 minutes ago")
+ */
+const formatRelativeTime = (date) => {
+    if (!date) return 'unknown';
+    const now = new Date();
+    const then = new Date(date);
+    const diffMs = now - then;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    return then.toLocaleDateString();
+};
+
 const IssueDetailDrawer = ({ open, onClose, issue }) => {
     const { user } = useAuth();
     const [currentIssue, setCurrentIssue] = useState(issue);
     const [comment, setComment] = useState('');
     const [sending, setSending] = useState(false);
     const [users, setUsers] = useState([]);
+    const [updating, setUpdating] = useState(false);
+    const [loadingField, setLoadingField] = useState(null);
+    const [aiLoading, setAiLoading] = useState(false);
+    const [aiInsights, setAiInsights] = useState(null);
     const screens = useBreakpoint();
-    const isMobile = !screens.sm; // < 576px
+    const isMobile = !screens.sm;
+    const originalIssueRef = useRef(issue);
 
     useEffect(() => {
         setCurrentIssue(issue);
+        originalIssueRef.current = issue;
     }, [issue]);
 
     useEffect(() => {
@@ -51,28 +100,206 @@ const IssueDetailDrawer = ({ open, onClose, issue }) => {
 
     if (!currentIssue) return null;
 
+    /**
+     * ========================================================================
+     * OPTIMISTIC UI UPDATE - Inline Editing
+     * ========================================================================
+     * 1. Update local state immediately (optimistic)
+     * 2. Call API in background
+     * 3. If API fails, revert to original state
+     */
     const handleUpdate = async (field, value) => {
+        // Validate workflow rules for status changes
+        if (field === 'status') {
+            if (!isValidStatusTransition(currentIssue.status, value)) {
+                message.warning(`Cannot transition from ${currentIssue.status} to ${value}`);
+                return;
+            }
+        }
+
+        // Save original state for rollback
+        const originalValue = currentIssue[field];
+        
+        // Optimistic update: update UI immediately
+        setCurrentIssue(prev => ({
+            ...prev,
+            [field]: value,
+            updatedAt: new Date().toISOString() // Update timestamp
+        }));
+
+        setLoadingField(field);
+
         try {
-            const updated = await taskService.updateTask(currentIssue._id, { [field]: value });
+            // API call in background
+            const updated = await taskService.updateTask(currentIssue._id, { 
+                [field]: value 
+            });
+            
+            // Sync with server response
             setCurrentIssue(updated);
-            message.success('Updated');
-        } catch {
-            message.error('Update failed');
+            message.success(`${field} updated`);
+        } catch (error) {
+            // Rollback on error
+            setCurrentIssue(prev => ({
+                ...prev,
+                [field]: originalValue,
+                updatedAt: originalIssueRef.current.updatedAt
+            }));
+            message.error(`Failed to update ${field}`);
+            console.error('Update error:', error);
+        } finally {
+            setLoadingField(null);
         }
     };
 
+    /**
+     * ========================================================================
+     * COMMENTS - Simple Text-based
+     * ========================================================================
+     * User types comment → Submit → Append to issue.comments → Display
+     * No threading, no reactions, no edit (MVP)
+     */
     const handleAddComment = async () => {
         if (!comment.trim()) return;
+        
         setSending(true);
         try {
-            const newComments = await taskService.addComment(currentIssue._id, comment);
-            setCurrentIssue(prev => ({ ...prev, comments: newComments }));
+            // Call API to add comment
+            const updated = await taskService.addComment(currentIssue._id, {
+                text: comment.trim(),
+                user: user._id
+            });
+
+            // Update UI with new comments
+            setCurrentIssue(prev => ({
+                ...prev,
+                comments: updated.comments || [
+                    ...prev.comments || [],
+                    {
+                        _id: Date.now(),
+                        text: comment,
+                        user: user,
+                        timestamp: new Date().toISOString()
+                    }
+                ],
+                updatedAt: new Date().toISOString()
+            }));
+
             setComment('');
             message.success('Comment added');
-        } catch {
+        } catch (error) {
+            console.error('Failed to add comment:', error);
             message.error('Failed to add comment');
         } finally {
             setSending(false);
+        }
+    };
+
+    /**
+     * ========================================================================
+     * AI HOOKS - Hackathon Differentiator
+     * ========================================================================
+     * TODO: Replace these with actual OpenAI API calls
+     * Endpoints:
+     * - POST /api/ai/summarize-issue (Claude/GPT-4)
+     * - POST /api/ai/suggest-action (Prompt engineering)
+     * - POST /api/ai/detect-risk (Heuristics + AI)
+     */
+    const handleAISummarize = async () => {
+        setAiLoading(true);
+        try {
+            // TODO: Implement OpenAI API call
+            // const response = await fetch('/api/ai/summarize-issue', {
+            //     method: 'POST',
+            //     headers: { 'Content-Type': 'application/json' },
+            //     body: JSON.stringify({ 
+            //         title: currentIssue.title,
+            //         description: currentIssue.description,
+            //         comments: currentIssue.comments
+            //     })
+            // });
+            // const data = await response.json();
+
+            // Mock response for demo
+            const mockSummary = `${currentIssue.title} is a ${currentIssue.issueType} with ${currentIssue.priority} priority. Currently ${currentIssue.status}. Assigned to ${currentIssue.assignedTo?.map(a => a.fullName).join(', ') || 'nobody'}.`;
+
+            setAiInsights({
+                summary: mockSummary,
+                timestamp: new Date().toISOString()
+            });
+            message.success('AI summary generated');
+        } catch (error) {
+            console.error('AI error:', error);
+            message.error('Failed to generate AI summary');
+        } finally {
+            setAiLoading(false);
+        }
+    };
+
+    const handleAISuggestAction = async () => {
+        setAiLoading(true);
+        try {
+            // TODO: Implement OpenAI API call
+            // const response = await fetch('/api/ai/suggest-action', { ... });
+            
+            const mockAction = currentIssue.status === 'in_progress' 
+                ? 'Move to "In Review" for team validation'
+                : currentIssue.status === 'todo'
+                ? 'Assign to team member and move to "In Progress"'
+                : currentIssue.status === 'review'
+                ? 'Fix issues identified in review, then move to "Done"'
+                : 'Create new issue for follow-up work';
+
+            setAiInsights(prev => ({
+                ...prev,
+                nextAction: mockAction,
+                timestamp: new Date().toISOString()
+            }));
+            message.success('AI suggestion generated');
+        } catch (error) {
+            console.error('AI error:', error);
+            message.error('Failed to generate suggestion');
+        } finally {
+            setAiLoading(false);
+        }
+    };
+
+    const handleAIDetectRisk = async () => {
+        setAiLoading(true);
+        try {
+            // TODO: Implement OpenAI API call with risk detection heuristics
+            // Check for:
+            // - High priority + no assignee
+            // - Overdue or approaching due date
+            // - Dependencies missing
+            // - Blocked by other issues
+            // - Story points too high (> 13)
+
+            const risks = [];
+            if (currentIssue.priority === 'critical' && !currentIssue.assignedTo?.length) {
+                risks.push('🚨 Critical priority but unassigned');
+            }
+            if (currentIssue.storyPoints > 13) {
+                risks.push('⚠️ Story points too high - consider breaking down');
+            }
+            if (currentIssue.dueDate && new Date(currentIssue.dueDate) < new Date()) {
+                risks.push('⏰ Past due date');
+            }
+            if (!currentIssue.description) {
+                risks.push('📝 Missing detailed description');
+            }
+
+            setAiInsights(prev => ({
+                ...prev,
+                risks: risks.length > 0 ? risks : ['✅ No risks detected'],
+                timestamp: new Date().toISOString()
+            }));
+            message.success('AI risk analysis complete');
+        } catch (error) {
+            console.error('AI error:', error);
+            message.error('Failed to analyze risks');
+        } finally {
+            setAiLoading(false);
         }
     };
 
@@ -91,86 +318,6 @@ const IssueDetailDrawer = ({ open, onClose, issue }) => {
         }
     };
 
-    // AI Suggestions Component
-    const AISuggestionsSection = () => {
-        const aiData = currentIssue.aiSuggestions;
-        if (!aiData || (!aiData.timeBreakdown?.length && !aiData.dependencies?.length)) {
-            return (
-                <Card size="small" style={{ marginBottom: 16, background: '#fafafa' }}>
-                    <Empty
-                        image={Empty.PRESENTED_IMAGE_SIMPLE}
-                        description="AI analysis not available for this task"
-                        style={{ margin: '12px 0' }}
-                    />
-                </Card>
-            );
-        }
-
-        return (
-            <Card
-                size="small"
-                title={<Space><BulbOutlined style={{ color: '#faad14' }} /> AI Analysis</Space>}
-                style={{ marginBottom: 16, background: 'linear-gradient(135deg, #fff9e6 0%, #fff 100%)' }}
-            >
-                {aiData.timeBreakdown && aiData.timeBreakdown.length > 0 && (
-                    <div style={{ marginBottom: 16 }}>
-                        <Text strong style={{ display: 'block', marginBottom: 8 }}>
-                            <ClockCircleOutlined /> Estimated Time Breakdown
-                        </Text>
-                        <Timeline
-                            items={aiData.timeBreakdown.map((item, idx) => ({
-                                key: idx,
-                                color: 'blue',
-                                children: (
-                                    <Space direction="vertical" size={0}>
-                                        <Text strong>{item.phase || item.task || `Phase ${idx + 1}`}</Text>
-                                        <Text type="secondary">{item.duration || item.time || 'TBD'}</Text>
-                                    </Space>
-                                )
-                            }))}
-                        />
-                    </div>
-                )}
-
-                {aiData.dependencies && aiData.dependencies.length > 0 && (
-                    <div>
-                        <Text strong style={{ display: 'block', marginBottom: 8 }}>
-                            <BranchesOutlined /> Dependencies
-                        </Text>
-                        <Space wrap>
-                            {aiData.dependencies.map((dep, idx) => (
-                                <Tag key={idx} color="purple">{dep}</Tag>
-                            ))}
-                        </Space>
-                    </div>
-                )}
-            </Card>
-        );
-    };
-
-    // Calendar Link Component
-    const CalendarLink = () => {
-        if (!currentIssue.calendarEventId) return null;
-
-        return (
-            <Card size="small" style={{ marginBottom: 16, background: '#f0f7ff' }}>
-                <Space>
-                    <CalendarOutlined style={{ color: '#1890ff' }} />
-                    <Text>This task is synced with Google Calendar</Text>
-                    <Tooltip title="View in Calendar">
-                        <Button
-                            type="link"
-                            size="small"
-                            onClick={() => window.open(`https://calendar.google.com/calendar/r/eventedit/${currentIssue.calendarEventId}`, '_blank')}
-                        >
-                            Open
-                        </Button>
-                    </Tooltip>
-                </Space>
-            </Card>
-        );
-    };
-
     const items = [
         {
             label: 'Status',
@@ -181,11 +328,21 @@ const IssueDetailDrawer = ({ open, onClose, issue }) => {
                     options={[
                         { value: 'todo', label: 'To Do' },
                         { value: 'in_progress', label: 'In Progress' },
-                        { value: 'review', label: 'Review' },
+                        { value: 'review', label: 'In Review' },
                         { value: 'done', label: 'Done' }
                     ]}
                     size="small"
                     style={{ width: 120 }}
+                    disabled={loadingField === 'status'}
+                    optionLabelRender={(option) => {
+                        const isValid = isValidStatusTransition(currentIssue.status, option.data.value);
+                        return (
+                            <Space>
+                                {option.data.label}
+                                {isValid && <CheckOutlined style={{ color: '#52c41a' }} />}
+                            </Space>
+                        );
+                    }}
                 />
             )
         },
@@ -203,6 +360,7 @@ const IssueDetailDrawer = ({ open, onClose, issue }) => {
                     ]}
                     size="small"
                     style={{ width: 120 }}
+                    disabled={loadingField === 'priority'}
                 />
             )
         },
@@ -211,12 +369,14 @@ const IssueDetailDrawer = ({ open, onClose, issue }) => {
             children: (
                 <Select
                     mode="multiple"
-                    value={currentIssue.assignedTo?.map(u => u._id || u)}
+                    value={currentIssue.assignedTo?.map(u => u._id || u) || []}
                     onChange={v => handleUpdate('assignedTo', v)}
                     style={{ width: '100%', minWidth: 150 }}
                     size="small"
                     placeholder="Unassigned"
                     optionFilterProp="label"
+                    disabled={loadingField === 'assignedTo'}
+                    loading={loadingField === 'assignedTo'}
                 >
                     {users.map(u => (
                         <Select.Option key={u._id} value={u._id} label={u.fullName}>
@@ -234,7 +394,9 @@ const IssueDetailDrawer = ({ open, onClose, issue }) => {
         {
             label: 'Reporter',
             children: <Space>
-                <Avatar size="small" style={{ backgroundColor: '#5E6C84' }}>{currentIssue.reporter?.fullName?.[0]}</Avatar>
+                <Avatar size="small" style={{ backgroundColor: '#5E6C84' }}>
+                    {currentIssue.reporter?.fullName?.[0]}
+                </Avatar>
                 {currentIssue.reporter?.fullName || 'Unknown'}
             </Space>
         },
@@ -244,16 +406,21 @@ const IssueDetailDrawer = ({ open, onClose, issue }) => {
         },
         {
             label: 'Story Points',
-            children: <Input
-                style={{ width: 60 }}
-                defaultValue={currentIssue.storyPoints}
-                onBlur={e => {
-                    if (e.target.value !== String(currentIssue.storyPoints)) {
-                        handleUpdate('storyPoints', Number(e.target.value));
-                    }
-                }}
-                size="small"
-            />
+            children: (
+                <Input
+                    type="number"
+                    style={{ width: 60 }}
+                    value={currentIssue.storyPoints}
+                    onChange={e => {
+                        const val = e.target.value;
+                        if (val && val !== String(currentIssue.storyPoints)) {
+                            handleUpdate('storyPoints', parseInt(val) || 0);
+                        }
+                    }}
+                    size="small"
+                    disabled={loadingField === 'storyPoints'}
+                />
+            )
         },
         {
             label: 'Due Date',
@@ -262,11 +429,6 @@ const IssueDetailDrawer = ({ open, onClose, issue }) => {
                 : <Text type="secondary">Not set</Text>
         }
     ];
-
-    const timelineItems = (currentIssue.history || []).map(h => ({
-        label: new Date(h.timestamp).toLocaleString(),
-        children: `${h.updatedBy?.fullName || 'User'} changed ${h.field} from "${h.oldValue}" to "${h.newValue}"`
-    })).reverse();
 
     return (
         <Drawer
@@ -302,32 +464,98 @@ const IssueDetailDrawer = ({ open, onClose, issue }) => {
             open={open}
             closable={false}
             mask={false}
-            headerStyle={{ padding: '12px 24px' }}
+            styles={{ header: { padding: '12px 24px' } }}
         >
             <div style={{ paddingBottom: 24 }}>
-                <Title level={4} editable={{ onChange: v => handleUpdate('title', v) }} style={{ marginBottom: 16 }}>
+                <Title level={4} style={{ marginBottom: 16 }}>
                     {currentIssue.title}
                 </Title>
+
+                {/* AI Hooks - Hackathon Differentiator */}
+                <Card 
+                    size="small" 
+                    style={{ marginBottom: 20, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderColor: 'transparent' }}
+                    styles={{ body: { padding: '12px 16px' } }}
+                >
+                    <div style={{ color: 'white', marginBottom: 12 }}>
+                        <Space>
+                            <RobotOutlined />
+                            <Text strong style={{ color: 'white' }}>AI Assistant</Text>
+                        </Space>
+                    </div>
+                    <Space wrap style={{ width: '100%' }}>
+                        <Button 
+                            size="small" 
+                            type="default"
+                            icon={aiLoading ? <LoadingOutlined /> : <BulbOutlined />}
+                            onClick={handleAISummarize}
+                            loading={aiLoading}
+                        >
+                            Summarize
+                        </Button>
+                        <Button 
+                            size="small" 
+                            type="default"
+                            icon={aiLoading ? <LoadingOutlined /> : <CheckOutlined />}
+                            onClick={handleAISuggestAction}
+                            loading={aiLoading}
+                        >
+                            Suggest Action
+                        </Button>
+                        <Button 
+                            size="small" 
+                            type="default"
+                            icon={aiLoading ? <LoadingOutlined /> : <ExclamationCircleOutlined />}
+                            onClick={handleAIDetectRisk}
+                            loading={aiLoading}
+                        >
+                            Detect Risk
+                        </Button>
+                    </Space>
+
+                    {/* AI Insights Display */}
+                    {aiInsights && (
+                        <div style={{ marginTop: 12, padding: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: 4, color: 'white', fontSize: 12 }}>
+                            {aiInsights.summary && (
+                                <div style={{ marginBottom: 8 }}>
+                                    <Text strong style={{ color: 'white' }}>Summary:</Text>
+                                    <div style={{ marginTop: 4, color: 'rgba(255,255,255,0.9)' }}>{aiInsights.summary}</div>
+                                </div>
+                            )}
+                            {aiInsights.nextAction && (
+                                <div style={{ marginBottom: 8 }}>
+                                    <Text strong style={{ color: 'white' }}>Suggested Action:</Text>
+                                    <div style={{ marginTop: 4, color: 'rgba(255,255,255,0.9)' }}>{aiInsights.nextAction}</div>
+                                </div>
+                            )}
+                            {aiInsights.risks && (
+                                <div>
+                                    <Text strong style={{ color: 'white' }}>Risk Assessment:</Text>
+                                    <div style={{ marginTop: 4 }}>
+                                        {aiInsights.risks.map((risk, idx) => (
+                                            <div key={idx} style={{ color: 'rgba(255,255,255,0.9)', marginBottom: 4 }}>
+                                                {risk}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </Card>
 
                 <Space style={{ marginBottom: 20 }} wrap>
                     <Button icon={<PaperClipOutlined />} size="small">Attach</Button>
                     <Button icon={<LinkOutlined />} size="small">Link Issue</Button>
                 </Space>
 
-                {/* Calendar Sync Notice */}
-                <CalendarLink />
-
-                {/* AI Suggestions Section */}
-                <AISuggestionsSection />
-
                 <div style={{ display: 'flex', gap: 24, flexDirection: 'column' }}>
                     <div>
                         <Title level={5}>Description</Title>
                         <Paragraph
-                            editable={{ onChange: v => handleUpdate('description', v) }}
                             style={{ minHeight: 60, color: '#172b4d', whiteSpace: 'pre-wrap' }}
                         >
-                            {currentIssue.description || 'Click to add description...'}
+                            {currentIssue.description || <Text type="secondary">No description</Text>}
                         </Paragraph>
 
                         <Tabs defaultActiveKey="1" items={[
@@ -337,32 +565,58 @@ const IssueDetailDrawer = ({ open, onClose, issue }) => {
                                 children: (
                                     <>
                                         <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-                                            <Avatar style={{ backgroundColor: '#0052CC' }}>{user?.fullName?.[0]}</Avatar>
+                                            <Avatar style={{ backgroundColor: '#0052CC' }}>
+                                                {user?.fullName?.[0]}
+                                            </Avatar>
                                             <div style={{ flex: 1 }}>
                                                 <TextArea
                                                     placeholder="Add a comment..."
                                                     autoSize={{ minRows: 2, maxRows: 6 }}
                                                     value={comment}
                                                     onChange={e => setComment(e.target.value)}
+                                                    disabled={sending}
                                                 />
                                                 {comment && (
                                                     <div style={{ marginTop: 8 }}>
-                                                        <Button type="primary" size="small" onClick={handleAddComment} loading={sending} style={{ marginRight: 8 }}>Save</Button>
+                                                        <Button 
+                                                            type="primary" 
+                                                            size="small" 
+                                                            onClick={handleAddComment} 
+                                                            loading={sending} 
+                                                            style={{ marginRight: 8 }}
+                                                        >
+                                                            {sending ? 'Posting...' : 'Post'}
+                                                        </Button>
                                                         <Button size="small" type="text" onClick={() => setComment('')}>Cancel</Button>
                                                     </div>
                                                 )}
                                             </div>
                                         </div>
+                                        
+                                        {/* Comments List */}
                                         <List
                                             itemLayout="horizontal"
                                             dataSource={currentIssue.comments || []}
-                                            locale={{ emptyText: 'No comments yet' }}
+                                            locale={{ emptyText: 'No comments yet. Start the conversation!' }}
                                             renderItem={(item) => (
-                                                <List.Item>
+                                                <List.Item style={{ paddingLeft: 0, paddingRight: 0 }}>
                                                     <List.Item.Meta
-                                                        avatar={<Avatar size="small" style={{ backgroundColor: '#5E6C84' }}>{item.user?.fullName?.[0]}</Avatar>}
-                                                        title={<Space><Text strong>{item.user?.fullName}</Text><Text type="secondary" style={{ fontSize: 12 }}>{new Date(item.timestamp).toLocaleString()}</Text></Space>}
-                                                        description={item.text}
+                                                        avatar={<Avatar size="small" style={{ backgroundColor: '#5E6C84' }}>
+                                                            {item.user?.fullName?.[0] || 'U'}
+                                                        </Avatar>}
+                                                        title={
+                                                            <Space size="small">
+                                                                <Text strong>{item.user?.fullName || 'Unknown'}</Text>
+                                                                <Text type="secondary" style={{ fontSize: 11 }}>
+                                                                    {formatRelativeTime(item.timestamp)}
+                                                                </Text>
+                                                            </Space>
+                                                        }
+                                                        description={
+                                                            <div style={{ marginTop: 4, color: '#262626', whiteSpace: 'pre-wrap' }}>
+                                                                {item.text}
+                                                            </div>
+                                                        }
                                                     />
                                                 </List.Item>
                                             )}
@@ -375,17 +629,23 @@ const IssueDetailDrawer = ({ open, onClose, issue }) => {
                                 label: 'History',
                                 children: (
                                     (currentIssue.history && currentIssue.history.length > 0) ?
-                                        <List
-                                            size="small"
-                                            dataSource={timelineItems}
-                                            renderItem={item => (
-                                                <List.Item>
-                                                    <Text type="secondary" style={{ fontSize: 12 }}>{item.label}</Text> <br />
-                                                    <Text>{item.children}</Text>
-                                                </List.Item>
-                                            )}
+                                        <Timeline
+                                            items={(currentIssue.history || []).reverse().map((h, idx) => ({
+                                                key: idx,
+                                                color: 'blue',
+                                                children: (
+                                                    <div>
+                                                        <Text type="secondary" style={{ fontSize: 12 }}>
+                                                            {formatRelativeTime(h.timestamp)}
+                                                        </Text>
+                                                        <div style={{ marginTop: 4, fontSize: 12 }}>
+                                                            <Text strong>{h.updatedBy?.fullName || 'User'}</Text> changed <Text code>{h.field}</Text> from <Text delete>{h.oldValue}</Text> to <Text underline>{h.newValue}</Text>
+                                                        </div>
+                                                    </div>
+                                                )
+                                            }))}
                                         /> :
-                                        <div style={{ padding: 16, textAlign: 'center', color: '#999' }}>No history yet</div>
+                                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No history yet" />
                                 )
                             }
                         ]} />
@@ -397,8 +657,12 @@ const IssueDetailDrawer = ({ open, onClose, issue }) => {
                         <Descriptions column={1} layout="horizontal" items={items} size="small" />
                         <Divider />
                         <div style={{ fontSize: 12, color: '#6B778C' }}>
-                            <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>Created {new Date(currentIssue.createdAt).toLocaleDateString()}</Text>
-                            <Text type="secondary">Updated {new Date(currentIssue.updatedAt).toLocaleDateString()}</Text>
+                            <Space direction="vertical" size={0}>
+                                <Text type="secondary">Created {currentIssue.createdAt ? new Date(currentIssue.createdAt).toLocaleDateString() : 'unknown'}</Text>
+                                <Text type="secondary">
+                                    Updated {currentIssue.updatedAt ? formatRelativeTime(currentIssue.updatedAt) : 'unknown'}
+                                </Text>
+                            </Space>
                         </div>
                     </div>
                 </div>

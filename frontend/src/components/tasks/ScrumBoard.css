@@ -1,0 +1,346 @@
+/* Scrum Board Container */
+.scrum-board-container {
+    padding: 24px;
+    height: 100%;
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    overflow-y: auto;
+}
+
+/* Sprint Header */
+.scrum-board-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #dfe1e6;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.sprint-selector-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.sprint-selector-section label {
+    font-weight: 600;
+    color: #161b22;
+    margin: 0;
+}
+
+.sprint-selector-section .ant-select {
+    min-width: 200px;
+}
+
+.sprint-details {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.sprint-name {
+    font-weight: 600;
+    font-size: 15px;
+    color: #161b22;
+}
+
+.sprint-status {
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.sprint-status.status-active {
+    background: #deebff;
+    color: #0052cc;
+}
+
+.sprint-status.status-planned {
+    background: #dffcf0;
+    color: #216e4e;
+}
+
+.sprint-status.status-completed {
+    background: #f0f0f0;
+    color: #626f86;
+}
+
+/* Sprint Metrics Card */
+.sprint-metrics-card {
+    background: #ffffff;
+    border: 1px solid #dfe1e6;
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 1px 1px rgba(9, 30, 66, 0.13);
+}
+
+.sprint-metrics-card .ant-statistic {
+    text-align: center;
+}
+
+.sprint-metrics-card .ant-statistic-title {
+    font-size: 12px;
+    color: #626f86;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.sprint-metrics-card .ant-statistic-content {
+    font-size: 24px;
+    font-weight: 700;
+    color: #161b22;
+}
+
+/* Scrum Board Layout */
+.scrum-board {
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+    padding-bottom: 16px;
+    min-height: 600px;
+}
+
+.scrum-board::-webkit-scrollbar {
+    height: 8px;
+}
+
+.scrum-board::-webkit-scrollbar-track {
+    background: #f8f9fa;
+}
+
+.scrum-board::-webkit-scrollbar-thumb {
+    background: #bcdffb;
+    border-radius: 4px;
+}
+
+.scrum-board::-webkit-scrollbar-thumb:hover {
+    background: #85b8ff;
+}
+
+/* Scrum Column */
+.scrum-column {
+    flex: 0 0 340px;
+    display: flex;
+    flex-direction: column;
+    background: #f8f9fa;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #dfe1e6;
+    transition: background-color 0.2s ease;
+}
+
+.scrum-column.dragging-over {
+    background-color: #deebff !important;
+}
+
+/* Column Header */
+.scrum-column-header {
+    padding: 16px;
+    background: #ffffff;
+    border-bottom: 1px solid #dfe1e6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 4px solid #626f86;
+}
+
+.column-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.column-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.column-name {
+    font-weight: 700;
+    font-size: 14px;
+    color: #161b22;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.column-count {
+    background: #f1f2f4;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #626f86;
+}
+
+/* Tasks Container */
+.scrum-tasks {
+    flex: 1;
+    padding: 12px 8px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.scrum-tasks::-webkit-scrollbar {
+    width: 6px;
+}
+
+.scrum-tasks::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.scrum-tasks::-webkit-scrollbar-thumb {
+    background: #bcdffb;
+    border-radius: 3px;
+}
+
+.scrum-tasks::-webkit-scrollbar-thumb:hover {
+    background: #85b8ff;
+}
+
+/* Scrum Card */
+.scrum-card {
+    background: white;
+    border: 1px solid #dfe1e6;
+    border-radius: 4px;
+    padding: 12px;
+    cursor: grab;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 1px rgba(9, 30, 66, 0.13);
+}
+
+.scrum-card:hover {
+    box-shadow: 0 4px 8px rgba(9, 30, 66, 0.15);
+    border-color: #0052cc;
+    transform: translateY(-2px);
+}
+
+.scrum-card.dragging {
+    opacity: 0.7;
+    cursor: grabbing;
+    box-shadow: 0 8px 16px rgba(9, 30, 66, 0.25);
+}
+
+/* Card Key */
+.scrum-card-key {
+    margin-bottom: 8px;
+}
+
+.task-key-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 3px;
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+/* Card Title */
+.scrum-card-title {
+    font-weight: 500;
+    font-size: 13px;
+    color: #161b22;
+    line-height: 1.5;
+    margin-bottom: 10px;
+    word-break: break-word;
+}
+
+/* Card Footer */
+.scrum-card-footer {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding-top: 8px;
+    border-top: 1px solid #eceef0;
+    font-size: 11px;
+}
+
+.priority-badge {
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.priority-badge.priority-high {
+    background: #ffeceb;
+    color: #ae2a19;
+}
+
+.priority-badge.priority-medium {
+    background: #fff7d6;
+    color: #974f0c;
+}
+
+.priority-badge.priority-low {
+    background: #dffcf0;
+    color: #216e4e;
+}
+
+.assignee {
+    background: #f1f2f4;
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: #44546f;
+    margin-left: auto;
+}
+
+/* Empty State */
+.scrum-board-container .ant-empty {
+    margin-top: 60px;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .scrum-column {
+        flex: 0 0 300px;
+    }
+}
+
+@media (max-width: 768px) {
+    .scrum-board-container {
+        padding: 16px;
+        gap: 16px;
+    }
+
+    .scrum-board-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .sprint-selector-section {
+        width: 100%;
+    }
+
+    .sprint-selector-section .ant-select {
+        width: 100%;
+    }
+
+    .scrum-board {
+        gap: 12px;
+        min-height: 500px;
+    }
+
+    .scrum-column {
+        flex: 0 0 100%;
+    }
+
+    .scrum-card {
+        padding: 10px;
+    }
+}

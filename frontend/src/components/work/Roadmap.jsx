@@ -90,7 +90,7 @@ const Roadmap = () => {
                 </Space>
             </div>
 
-            <Card bodyStyle={{ padding: 0, height: 600, overflow: 'hidden' }}>
+            <Card styles={{ body: { padding: 0, height: 600, overflow: 'hidden' } }}>
                 <div style={{ display: 'flex', height: '100%' }}>
                     {/* Left Pane: Epic List */}
                     <div style={{ width: 250, borderRight: '1px solid #dfe1e6', display: 'flex', flexDirection: 'column' }}>

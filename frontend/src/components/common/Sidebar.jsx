@@ -100,7 +100,7 @@ const Sidebar = ({ mobileOpen, setMobileOpen, collapsed }) => {
                 onClose={() => setMobileOpen(false)}
                 open={mobileOpen}
                 width={280}
-                bodyStyle={{ padding: 0 }}
+                styles={{ body: { padding: 0 } }}
                 headerStyle={{ display: 'none' }} // Hide mock header in drawer
             >
                 <div style={{ padding: '24px 24px 0', marginBottom: 24 }}>

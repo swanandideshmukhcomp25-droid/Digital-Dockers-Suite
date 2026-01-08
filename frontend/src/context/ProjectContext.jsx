@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { useAuth } from './AuthContext';
 import projectService from '../services/projectService';
 import sprintService from '../services/sprintService';
 
@@ -8,17 +9,20 @@ const ProjectContext = createContext();
 export const useProject = () => useContext(ProjectContext);
 
 export const ProjectProvider = ({ children }) => {
+    const { user } = useAuth();
     const [projects, setProjects] = useState([]);
     const [currentProject, setCurrentProject] = useState(null);
     const [sprints, setSprints] = useState([]);
     const [activeSprint, setActiveSprint] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
 
-    // Initial Load
+    // Initial Load - only when user is authenticated
     useEffect(() => {
-        loadProjects();
+        if (user) {
+            loadProjects();
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [user]);
 
     // Load Sprints when project changes
     useEffect(() => {

@@ -12,9 +12,9 @@ import GoogleCallback from './pages/GoogleCallback';
 import DashboardLayout from './components/common/DashboardLayout';
 import DashboardHome from './components/dashboards/DashboardHome';
 import NotFoundPage from './pages/NotFoundPage';
-import TaskBoard from './components/tasks/TaskBoard';
-import Backlog from './components/work/Backlog';
-import Roadmap from './components/work/Roadmap';
+import TasksPage from './components/tasks/TasksPage';
+import BacklogPage from './components/backlog/BacklogPage';
+import RoadmapPage from './components/dashboards/RoadmapPage';
 import MeetingsPage from './components/meetings/MeetingsPage';
 import EmailGenerator from './components/email/EmailGenerator';
 import DocumentManager from './components/documents/DocumentManager';
@@ -71,9 +71,9 @@ function App() {
                   <Route index element={<DashboardHome />} />
 
                   {/* Feature Routes */}
-                  <Route path="tasks" element={<TaskBoard />} />
-                  <Route path="backlog" element={<Backlog />} />
-                  <Route path="roadmap" element={<Roadmap />} />
+                  <Route path="tasks" element={<TasksPage />} />
+                  <Route path="backlog" element={<BacklogPage />} />
+                  <Route path="roadmap" element={<RoadmapPage />} />
                   <Route path="meetings" element={<MeetingsPage />} />
                   <Route path="emails" element={<EmailGenerator />} />
                   <Route path="documents" element={<DocumentManager />} />

@@ -1,0 +1,269 @@
+/* RoadmapPage.css */
+
+.roadmap-page {
+    padding: 24px;
+    background: #fafafa;
+    min-height: 100vh;
+}
+
+.roadmap-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 32px;
+}
+
+.roadmap-header h1 {
+    margin: 0 0 8px 0;
+    font-size: 28px;
+    font-weight: 600;
+    color: #161b22;
+}
+
+.roadmap-header .text-secondary {
+    margin: 0;
+    font-size: 14px;
+    color: #666;
+}
+
+.roadmap-controls {
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    border-radius: 6px;
+}
+
+.control-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #666;
+    margin-bottom: 8px;
+}
+
+.legend {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #333;
+}
+
+.legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    display: inline-block;
+}
+
+/* Timeline Styles */
+.epic-timeline-container {
+    background: white;
+    border-radius: 6px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    overflow-x: auto;
+}
+
+.timeline-header {
+    display: flex;
+    padding: 16px;
+    background: #fafafa;
+    border-bottom: 1px solid #dfe1e6;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.epic-name-column {
+    flex: 0 0 250px;
+    min-width: 250px;
+    font-weight: 600;
+    font-size: 13px;
+    color: #333;
+    text-transform: uppercase;
+}
+
+.timeline-months {
+    display: flex;
+    flex: 1;
+    gap: 0;
+}
+
+.month-header {
+    flex: 0 0 100px;
+    min-width: 100px;
+    padding: 8px;
+    text-align: center;
+    border-left: 1px solid #e8e8e8;
+    font-size: 11px;
+    font-weight: 600;
+    color: #666;
+}
+
+.month-header .month-name {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.month-header .year-name {
+    display: block;
+    font-size: 10px;
+    color: #999;
+    margin-top: 2px;
+}
+
+/* Epic Row */
+.epic-row {
+    border: 1px solid #dfe1e6;
+    border-radius: 4px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+    transition: box-shadow 0.2s;
+}
+
+.epic-row:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.epic-info {
+    padding-right: 16px;
+}
+
+.epic-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #161b22;
+    margin-bottom: 8px;
+}
+
+.epic-description {
+    font-size: 13px;
+    color: #666;
+    margin: 8px 0;
+    line-height: 1.5;
+    max-width: 300px;
+}
+
+.epic-owner {
+    font-size: 12px;
+    color: #0052cc;
+    margin-top: 8px;
+}
+
+.epic-owner .anticon {
+    margin-right: 4px;
+}
+
+/* Timeline */
+.epic-timeline {
+    position: relative;
+}
+
+.timeline-track {
+    position: relative;
+    height: 40px;
+    background: linear-gradient(
+        to right,
+        transparent 0%,
+        transparent calc(100% - 1px),
+        #e8e8e8 calc(100% - 1px),
+        #e8e8e8 100%
+    );
+    background-size: 100px 100%;
+    background-position: 0 0;
+    border-radius: 4px;
+}
+
+.epic-bar {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 24px;
+    background: #1890ff;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    min-width: 80px;
+}
+
+.epic-bar:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    transform: translateY(-50%) translateY(-2px);
+}
+
+.bar-label {
+    font-size: 11px;
+    color: white;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bar-label .anticon {
+    margin-right: 4px;
+    font-size: 10px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .roadmap-header {
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .roadmap-header > div:last-child {
+        width: 100%;
+    }
+
+    .epic-name-column {
+        flex: 0 0 200px;
+        min-width: 200px;
+    }
+
+    .month-header {
+        flex: 0 0 80px;
+        min-width: 80px;
+        font-size: 10px;
+        padding: 4px;
+    }
+
+    .epic-info {
+        padding-right: 8px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #dfe1e6;
+    }
+
+    .epic-row :global(.ant-row) {
+        flex-direction: column;
+    }
+
+    .epic-timeline {
+        width: 100%;
+        margin-top: 12px;
+    }
+
+    .timeline-track {
+        height: 32px;
+    }
+
+    .epic-bar {
+        height: 20px;
+        font-size: 10px;
+    }
+}
+
+/* Loading state */
+:global(.ant-spin-spinning) {
+    background: rgba(255, 255, 255, 0.9);
+}

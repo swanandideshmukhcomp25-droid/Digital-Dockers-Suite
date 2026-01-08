@@ -8,26 +8,22 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const checkLoggedIn = async () => {
-            const token = localStorage.getItem('token');
-            if (token) {
-                try {
-                    // In a real app, you'd call an endpoint like /auth/me
-                    // For now, we'll try to persist the user if we saved it in localStorage
-                    // Or ideally, we should decode the token if it contains user info.
-
-                    // Let's assume we save user info in localStorage alongside token for now
+        const checkLoggedIn = () => {
+            try {
+                const token = localStorage.getItem('token');
+                if (token) {
                     const storedUser = localStorage.getItem('user');
                     if (storedUser) {
                         setUser(JSON.parse(storedUser));
                     }
-                } catch (error) {
-                    console.error("Auth check failed", error);
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('user');
                 }
+            } catch (error) {
+                console.error("Auth check failed", error);
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         };
         checkLoggedIn();
     }, []);

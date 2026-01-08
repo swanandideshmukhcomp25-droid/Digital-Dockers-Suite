@@ -126,7 +126,7 @@ const Backlog = () => {
                     <Card
                         key={sprint._id}
                         style={{ marginBottom: 24, background: colorBgContainer }}
-                        bodyStyle={{ padding: 24 }}
+                        styles={{ body: { padding: 24 } }}
                         title={
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <Space direction="vertical" size={0}>
@@ -206,9 +206,9 @@ const Backlog = () => {
                 {/* Backlog Section */}
                 <Card
                     title={<Text strong>Backlog ({backlogIssues.length} issues)</Text>}
-                    bordered={false}
+                    variant="borderless"
                     style={{ background: 'transparent' }}
-                    bodyStyle={{ padding: 0 }}
+                    styles={{ body: { padding: 0 } }}
                 >
                     <Droppable droppableId="backlog">
                         {(provided, snapshot) => (
