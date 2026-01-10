@@ -5,7 +5,6 @@ import 'react-toastify/dist/ReactToastify.css';
 
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { TimerProvider } from './context/TimerContext';
 import LandingPage from './pages/landing/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -15,7 +14,7 @@ import DashboardHome from './components/dashboards/DashboardHome';
 import NotFoundPage from './pages/NotFoundPage';
 import TasksPage from './components/tasks/TasksPage';
 import BacklogPage from './components/backlog/BacklogPage';
-import RoadmapPage from './pages/RoadmapPage';
+import RoadmapPage from './components/dashboards/RoadmapPage';
 import MeetingsPage from './components/meetings/MeetingsPage';
 import EmailGeneratorPage from './pages/apps/EmailGeneratorPage';
 import DocumentManager from './components/documents/DocumentManager';
@@ -28,12 +27,9 @@ import { ProjectProvider } from './context/ProjectContext';
 import ChatPage from './components/chat/ChatPage';
 import OrgGraph from './components/org/OrgGraph';
 import ProjectsListPage from './pages/ProjectsListPage';
-<<<<<<< Updated upstream
-import Spaces from './components/spaces/Spaces';
-=======
 import TeamManagement from './components/admin/TeamManagement';
-import ChatbotWidget from './components/common/ChatbotWidget';
->>>>>>> Stashed changes
+import SlideGeneratorPage from './pages/apps/SlideGeneratorPage';
+import PresentationViewer from './pages/apps/PresentationViewer';
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children, roles = [] }) => {
@@ -57,11 +53,10 @@ function App() {
     <ThemeProvider>
       <CssBaseline />
       <AuthProvider>
-        <TimerProvider>
-          <ChatProvider>
-            <ProjectProvider>
-              <Router>
-                <Routes>
+        <ChatProvider>
+          <ProjectProvider>
+            <Router>
+              <Routes>
                 {/* ... existing routes ... */}
                 {/* Public Routes */}
                 <Route path="/" element={<LandingPage />} />
@@ -92,30 +87,21 @@ function App() {
                   <Route path="chat" element={<ChatPage />} />
                   <Route path="organization" element={<OrgGraph />} />
                   <Route path="projects" element={<ProjectsListPage />} />
-<<<<<<< Updated upstream
-                  <Route path="spaces" element={<Spaces />} />
-=======
+                  <Route path="slide-generator" element={<SlideGeneratorPage />} />
+                  <Route path="presentations/:id" element={<PresentationViewer />} />
                   <Route path="team-management" element={
                     <ProtectedRoute roles={['admin']}>
                       <TeamManagement />
                     </ProtectedRoute>
                   } />
->>>>>>> Stashed changes
                 </Route>
 
                 {/* Fallback */}
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </Router>
-<<<<<<< Updated upstream
-            </ProjectProvider>
-          </ChatProvider>
-        </TimerProvider>
-=======
           </ProjectProvider>
         </ChatProvider>
-        <ChatbotWidget />
->>>>>>> Stashed changes
       </AuthProvider>
       <ToastContainer position="top-right" />
     </ThemeProvider>

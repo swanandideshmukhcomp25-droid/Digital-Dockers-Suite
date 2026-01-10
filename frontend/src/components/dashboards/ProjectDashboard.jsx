@@ -9,14 +9,8 @@ import searchService from '../../services/searchService';
 import ForYouSection from './ForYouSection';
 import UpcomingWorkCard from './UpcomingWorkCard';
 import StatusOverview from './StatusOverview';
-<<<<<<< Updated upstream
 import TypesOfWorkCard from './TypesOfWorkCard';
 import SprintBurndownChart from '../charts/SprintBurndownChart';
-=======
-import AIInsightBanner from './AIInsightBanner';
-import EmailGeneratorForm from '../common/EmailGeneratorForm';
-import { generateMockForYouData, generateMockActivityData, generateMockUpcomingTasks } from '../../utils/mockDashboardData';
->>>>>>> Stashed changes
 import './dashboard.css';
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, PointElement, LineElement);
@@ -223,7 +217,7 @@ const ProjectDashboard = () => {
                     {/* Sprint Burndown Chart */}
                     {stats?.activeSprint && (
                         <div style={{ marginBottom: 24 }}>
-                            <SprintBurndownChart 
+                            <SprintBurndownChart
                                 sprintId={stats.activeSprint._id}
                                 sprintName={stats.activeSprint.name}
                             />
@@ -260,9 +254,9 @@ const ProjectDashboard = () => {
                                 <div className="ant-card-body">
                                     <div className="chart-container">
                                         {sprintVelocityData ? (
-                                            <Line 
-                                                data={sprintVelocityData} 
-                                                options={{ 
+                                            <Line
+                                                data={sprintVelocityData}
+                                                options={{
                                                     maintainAspectRatio: false,
                                                     responsive: true,
                                                     plugins: {
@@ -276,7 +270,7 @@ const ProjectDashboard = () => {
                                                             beginAtZero: true
                                                         }
                                                     }
-                                                }} 
+                                                }}
                                             />
                                         ) : (
                                             <Empty description="No sprint data" />
@@ -345,13 +339,13 @@ const ProjectDashboard = () => {
                                                 >
                                                     {/* Assignee Column */}
                                                     <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
-                                                        <Avatar 
+                                                        <Avatar
                                                             size={32}
                                                             style={{ backgroundColor: '#0052cc', fontSize: '12px', fontWeight: 700, flexShrink: 0 }}
                                                         >
                                                             {item.name?.[0]?.toUpperCase()}
                                                         </Avatar>
-                                                        <Text 
+                                                        <Text
                                                             ellipsis
                                                             style={{ fontSize: '13px', color: '#262626', fontWeight: 500 }}
                                                         >
@@ -377,8 +371,8 @@ const ProjectDashboard = () => {
                                                                 }}></div>
                                                             </div>
                                                         </div>
-                                                        <Text 
-                                                            strong 
+                                                        <Text
+                                                            strong
                                                             style={{ fontSize: '12px', color: '#262626', minWidth: 35, textAlign: 'right', flexShrink: 0 }}
                                                         >
                                                             {Math.round(percentage)}%
@@ -422,22 +416,10 @@ const ProjectDashboard = () => {
                             />
                         </div>
                     )}
-<<<<<<< Updated upstream
-=======
 
-                    {/* Activity Feed */}
-                    {activityData.length > 0 && (
-                        <RecentActivityPanel activities={activityData} />
-                    )}
-
-                    {/* Email Generator Form */}
-                    <div style={{ marginTop: 24 }}>
-                        <EmailGeneratorForm />
-                    </div>
->>>>>>> Stashed changes
-                </Col>
-            </Row>
-        </div>
+                </Col >
+            </Row >
+        </div >
     );
 };
 

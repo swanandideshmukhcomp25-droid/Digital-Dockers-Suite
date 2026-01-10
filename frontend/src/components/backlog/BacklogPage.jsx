@@ -51,15 +51,9 @@ const BacklogPage = () => {
             setIssues(data);
 
             // Separate into backlog and sprint issues
-<<<<<<< Updated upstream
             const backlog = data.filter(issue => !issue.sprint);
             const sprint = data.filter(issue => issue.sprint?._id === activeSprint?._id);
-            
-=======
-            const backlog = data.filter(issue => !issue.sprintId);
-            const sprint = data.filter(issue => issue.sprintId === activeSprint?._id);
 
->>>>>>> Stashed changes
             setBacklogIssues(backlog);
             setSprintIssues(sprint);
         } catch (error) {
