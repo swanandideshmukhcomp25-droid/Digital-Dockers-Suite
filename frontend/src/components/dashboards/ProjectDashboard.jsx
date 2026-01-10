@@ -9,8 +9,14 @@ import searchService from '../../services/searchService';
 import ForYouSection from './ForYouSection';
 import UpcomingWorkCard from './UpcomingWorkCard';
 import StatusOverview from './StatusOverview';
+<<<<<<< Updated upstream
 import TypesOfWorkCard from './TypesOfWorkCard';
 import SprintBurndownChart from '../charts/SprintBurndownChart';
+=======
+import AIInsightBanner from './AIInsightBanner';
+import EmailGeneratorForm from '../common/EmailGeneratorForm';
+import { generateMockForYouData, generateMockActivityData, generateMockUpcomingTasks } from '../../utils/mockDashboardData';
+>>>>>>> Stashed changes
 import './dashboard.css';
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, PointElement, LineElement);
@@ -416,6 +422,19 @@ const ProjectDashboard = () => {
                             />
                         </div>
                     )}
+<<<<<<< Updated upstream
+=======
+
+                    {/* Activity Feed */}
+                    {activityData.length > 0 && (
+                        <RecentActivityPanel activities={activityData} />
+                    )}
+
+                    {/* Email Generator Form */}
+                    <div style={{ marginTop: 24 }}>
+                        <EmailGeneratorForm />
+                    </div>
+>>>>>>> Stashed changes
                 </Col>
             </Row>
         </div>

@@ -17,7 +17,7 @@ import TasksPage from './components/tasks/TasksPage';
 import BacklogPage from './components/backlog/BacklogPage';
 import RoadmapPage from './pages/RoadmapPage';
 import MeetingsPage from './components/meetings/MeetingsPage';
-import EmailGenerator from './components/email/EmailGenerator';
+import EmailGeneratorPage from './pages/apps/EmailGeneratorPage';
 import DocumentManager from './components/documents/DocumentManager';
 import WellnessCheckin from './components/wellness/WellnessCheckin';
 import ReportDashboard from './components/reports/ReportDashboard';
@@ -28,7 +28,12 @@ import { ProjectProvider } from './context/ProjectContext';
 import ChatPage from './components/chat/ChatPage';
 import OrgGraph from './components/org/OrgGraph';
 import ProjectsListPage from './pages/ProjectsListPage';
+<<<<<<< Updated upstream
 import Spaces from './components/spaces/Spaces';
+=======
+import TeamManagement from './components/admin/TeamManagement';
+import ChatbotWidget from './components/common/ChatbotWidget';
+>>>>>>> Stashed changes
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children, roles = [] }) => {
@@ -78,7 +83,7 @@ function App() {
                   <Route path="backlog" element={<BacklogPage />} />
                   <Route path="roadmap" element={<RoadmapPage />} />
                   <Route path="meetings" element={<MeetingsPage />} />
-                  <Route path="emails" element={<EmailGenerator />} />
+                  <Route path="email-generator" element={<EmailGeneratorPage />} />
                   <Route path="documents" element={<DocumentManager />} />
                   <Route path="wellness" element={<WellnessCheckin />} />
                   <Route path="reports" element={<ReportDashboard />} />
@@ -87,16 +92,30 @@ function App() {
                   <Route path="chat" element={<ChatPage />} />
                   <Route path="organization" element={<OrgGraph />} />
                   <Route path="projects" element={<ProjectsListPage />} />
+<<<<<<< Updated upstream
                   <Route path="spaces" element={<Spaces />} />
+=======
+                  <Route path="team-management" element={
+                    <ProtectedRoute roles={['admin']}>
+                      <TeamManagement />
+                    </ProtectedRoute>
+                  } />
+>>>>>>> Stashed changes
                 </Route>
 
                 {/* Fallback */}
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </Router>
+<<<<<<< Updated upstream
             </ProjectProvider>
           </ChatProvider>
         </TimerProvider>
+=======
+          </ProjectProvider>
+        </ChatProvider>
+        <ChatbotWidget />
+>>>>>>> Stashed changes
       </AuthProvider>
       <ToastContainer position="top-right" />
     </ThemeProvider>

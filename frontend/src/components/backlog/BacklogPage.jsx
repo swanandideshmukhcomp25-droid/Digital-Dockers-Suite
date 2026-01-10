@@ -47,13 +47,19 @@ const BacklogPage = () => {
             const data = await taskService.getTasks({
                 projectId: currentProject._id
             });
-            
+
             setIssues(data);
-            
+
             // Separate into backlog and sprint issues
+<<<<<<< Updated upstream
             const backlog = data.filter(issue => !issue.sprint);
             const sprint = data.filter(issue => issue.sprint?._id === activeSprint?._id);
             
+=======
+            const backlog = data.filter(issue => !issue.sprintId);
+            const sprint = data.filter(issue => issue.sprintId === activeSprint?._id);
+
+>>>>>>> Stashed changes
             setBacklogIssues(backlog);
             setSprintIssues(sprint);
         } catch (error) {
@@ -68,7 +74,7 @@ const BacklogPage = () => {
         const { source, destination, draggableId } = result;
 
         if (!destination) return;
-        if (source.droppableId === destination.droppableId && 
+        if (source.droppableId === destination.droppableId &&
             source.index === destination.index) return;
 
         const sourceSection = source.droppableId; // 'backlog' or 'sprint'
@@ -218,7 +224,7 @@ const BacklogPage = () => {
                 <Row gutter={[32, 32]}>
                     {/* Backlog Section */}
                     <Col xs={24} lg={12}>
-                        <Card 
+                        <Card
                             title={
                                 <Text strong>
                                     Backlog ({backlogIssues.length})
@@ -269,7 +275,7 @@ const BacklogPage = () => {
                                         <Tag
                                             color={
                                                 activeSprint.status === 'active' ? '#52c41a' :
-                                                activeSprint.status === 'planning' ? '#1890ff' : '#999'
+                                                    activeSprint.status === 'planning' ? '#1890ff' : '#999'
                                             }
                                             style={{ marginLeft: '8px' }}
                                         >
