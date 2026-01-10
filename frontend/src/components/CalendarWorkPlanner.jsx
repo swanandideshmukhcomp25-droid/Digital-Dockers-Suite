@@ -175,7 +175,7 @@ const CalendarWorkPlanner = () => {
                 currentDate.add(1, 'day');
             }
             weeks.push(
-                <div key={currentDate.format('YYYY-MM-W')} className="calendar-week">
+                <div key={`week-${currentDate.format('YYYY-MM-DD')}`} className="calendar-week">
                     {week}
                 </div>
             );
