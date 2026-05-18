@@ -14,7 +14,7 @@ import axios from 'axios';
 export const useRealtimeNotifications = (token) => {
   const socketRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
-  
+
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
@@ -30,15 +30,12 @@ export const useRealtimeNotifications = (token) => {
     }
 
     try {
-      const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
+      const socket = io(import.meta.env.VITE_API_URL || '/', {
         reconnection: true,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
         reconnectionAttempts: 10,
-        transports: ['websocket', 'polling'],
-        auth: {
-          token
-        }
+        withCredentials: true,
       });
 
       // Connection events
@@ -48,11 +45,12 @@ export const useRealtimeNotifications = (token) => {
         setError(null);
 
         // Authenticate
-        socket.emit('notification:authenticate', { token }, (response) => {
+        const authPayload = token ? { token } : {};
+        socket.emit('notification:authenticate', authPayload, (response) => {
           if (response.success) {
             console.log('[Notification] Authenticated successfully');
             setUnreadCount(response.unreadCount);
-            
+
             // Set initial notifications
             if (response.feed && response.feed.length > 0) {
               setNotifications(response.feed);
@@ -61,8 +59,8 @@ export const useRealtimeNotifications = (token) => {
 
             // Handle reconnect - fetch missed notifications
             if (lastNotificationId) {
-              socket.emit('notification:reconnect', 
-                { lastNotificationId }, 
+              socket.emit('notification:reconnect',
+                { lastNotificationId },
                 (reconnectResponse) => {
                   if (reconnectResponse.success && reconnectResponse.newNotifications?.length > 0) {
                     setNotifications(prev => [
@@ -142,9 +140,9 @@ export const useRealtimeNotifications = (token) => {
     } catch (err) {
       console.error('[Notification] Failed to connect:', err);
       setError(err.message);
-      
+
       // Retry connection after delay
-      reconnectTimeoutRef.current = setTimeout(connect, 5000);
+      reconnectTimeoutRef.current = setTimeout(() => connect(), 5000);
     }
   }, [token, lastNotificationId]);
 
@@ -158,11 +156,11 @@ export const useRealtimeNotifications = (token) => {
 
     // Also make API call for persistence
     axios.put(
-      `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/notifications/${notificationId}/read`,
+      `${import.meta.env.VITE_API_URL || '/'}/api/notifications/${notificationId}/read`,
       {},
-      { headers: { Authorization: `Bearer ${token}` } }
+      { withCredentials: true }
     ).catch(err => console.error('[Notification] Error marking as read:', err));
-  }, [token]);
+  }, []);
 
   /**
    * Mark all notifications as read
@@ -173,11 +171,11 @@ export const useRealtimeNotifications = (token) => {
     }
 
     axios.put(
-      `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/notifications/read/all`,
+      `${import.meta.env.VITE_API_URL || '/'}/api/notifications/read/all`,
       {},
-      { headers: { Authorization: `Bearer ${token}` } }
+      { withCredentials: true }
     ).catch(err => console.error('[Notification] Error marking all as read:', err));
-  }, [token]);
+  }, []);
 
   /**
    * Archive notification
@@ -188,11 +186,11 @@ export const useRealtimeNotifications = (token) => {
     }
 
     axios.put(
-      `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/notifications/${notificationId}/archive`,
+      `${import.meta.env.VITE_API_URL || '/'}/api/notifications/${notificationId}/archive`,
       {},
-      { headers: { Authorization: `Bearer ${token}` } }
+      { withCredentials: true }
     ).catch(err => console.error('[Notification] Error archiving:', err));
-  }, [token]);
+  }, []);
 
   /**
    * Fetch notifications from API (fallback/initial load)
@@ -200,10 +198,10 @@ export const useRealtimeNotifications = (token) => {
   const fetchNotifications = useCallback(async (page = 1, limit = 10) => {
     try {
       const response = await axios.get(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/notifications`,
+        `${import.meta.env.VITE_API_URL || '/'}/api/notifications`,
         {
           params: { page, limit },
-          headers: { Authorization: `Bearer ${token}` }
+          withCredentials: true
         }
       );
       return response.data.data;
@@ -211,7 +209,7 @@ export const useRealtimeNotifications = (token) => {
       console.error('[Notification] Error fetching notifications:', err);
       throw err;
     }
-  }, [token]);
+  }, []);
 
   /**
    * Request notification feed
@@ -242,13 +240,12 @@ export const useRealtimeNotifications = (token) => {
 
   // Connect on mount
   useEffect(() => {
-    if (token) {
-      connect();
-    }
+    connect();
 
     return () => {
       disconnect();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   return {

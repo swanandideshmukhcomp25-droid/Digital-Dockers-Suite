@@ -13,6 +13,11 @@ export const TimerProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const timerRef = React.useRef(runningTimer);
+  useEffect(() => {
+    timerRef.current = runningTimer;
+  }, [runningTimer]);
+
   // Load running timer on mount
   useEffect(() => {
     const loadRunningTimer = async () => {
@@ -33,8 +38,8 @@ export const TimerProvider = ({ children }) => {
     loadRunningTimer();
 
     // Stop timers when user logs out (before unload)
-    const handleBeforeUnload = async (e) => {
-      if (runningTimer) {
+    const handleBeforeUnload = async () => {
+      if (timerRef.current) {
         try {
           await axios.post('/api/users/me/timers/stop');
         } catch (err) {
@@ -53,7 +58,7 @@ export const TimerProvider = ({ children }) => {
       const response = await axios.post(`/api/work-items/${workItemId}/work-logs/start`, {
         description
       });
-      
+
       if (response.data.success) {
         setRunningTimer(response.data.data);
         setError(null);
@@ -69,7 +74,7 @@ export const TimerProvider = ({ children }) => {
   const stopTimer = useCallback(async (workItemId) => {
     try {
       const response = await axios.post(`/api/work-items/${workItemId}/work-logs/stop`);
-      
+
       if (response.data.success) {
         setRunningTimer(null);
         setError(null);
@@ -89,7 +94,7 @@ export const TimerProvider = ({ children }) => {
 
     try {
       const response = await axios.post(`/api/work-items/${runningTimer.workItemId}/work-logs/stop`);
-      
+
       if (response.data.success) {
         setRunningTimer(null);
         setError(null);
@@ -105,7 +110,7 @@ export const TimerProvider = ({ children }) => {
   const stopAllTimers = useCallback(async () => {
     try {
       const response = await axios.post('/api/users/me/timers/stop');
-      
+
       if (response.data.success) {
         setRunningTimer(null);
         setError(null);
@@ -157,6 +162,7 @@ export const TimerProvider = ({ children }) => {
 /**
  * Hook to use timer context
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export const useTimerContext = () => {
   const context = useContext(TimerContext);
   if (!context) {

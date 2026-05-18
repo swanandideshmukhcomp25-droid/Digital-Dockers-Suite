@@ -3,6 +3,15 @@ const Project = require('../models/Project');
 const User = require('../models/User');
 const Task = require('../models/Task');
 const Sprint = require('../models/Sprint');
+const Epic = require('../models/Epic');
+const Space = require('../models/Space');
+const SpaceContent = require('../models/SpaceContent');
+const SpaceMember = require('../models/SpaceMember');
+const SpaceComment = require('../models/SpaceComment');
+const SpaceActivity = require('../models/SpaceActivity');
+const ActivityLog = require('../models/ActivityLog');
+const Team = require('../models/Team');
+const Notification = require('../models/Notification');
 
 // @desc    Create a new project
 // @route   POST /api/projects
@@ -34,7 +43,7 @@ const createProject = asyncHandler(async (req, res) => {
 const getProjects = asyncHandler(async (req, res) => {
     // For now, return all projects or filter by membership
     // const projects = await Project.find({ members: req.user._id }); 
-    const projects = await Project.find({}); // MVP: See all projects
+    const projects = await Project.find({}).sort({ createdAt: -1 }); // Newest first
     res.json(projects);
 });
 
@@ -54,57 +63,145 @@ const getProjectById = asyncHandler(async (req, res) => {
     }
 });
 
+// @desc    Update a project
+// @route   PUT/PATCH /api/projects/:id
+// @access  Private/Admin
+const updateProject = asyncHandler(async (req, res) => {
+    const project = await Project.findById(req.params.id);
+
+    if (!project) {
+        res.status(404);
+        throw new Error('Project not found');
+    }
+
+    const { name, key, description, projectType, type, lead, members, defaultAssignee } = req.body;
+    const normalizedKey = key ? String(key).trim().toUpperCase() : undefined;
+
+    if (normalizedKey && normalizedKey !== project.key) {
+        const existing = await Project.findOne({ key: normalizedKey, _id: { $ne: project._id } });
+        if (existing) {
+            res.status(400);
+            throw new Error('Project key already exists');
+        }
+        project.key = normalizedKey;
+    }
+
+    if (name !== undefined) project.name = name;
+    if (description !== undefined) project.description = description;
+
+    const nextProjectType = projectType || type;
+    if (nextProjectType !== undefined) {
+        project.projectType = nextProjectType;
+    }
+
+    if (lead !== undefined) project.lead = lead || null;
+    if (defaultAssignee !== undefined) project.defaultAssignee = defaultAssignee || null;
+    if (Array.isArray(members)) {
+        // Ensure lead remains part of members when both are set
+        const nextMembers = [...new Set(members.map((m) => m.toString()))];
+        if (project.lead && !nextMembers.includes(project.lead.toString())) {
+            nextMembers.push(project.lead.toString());
+        }
+        project.members = nextMembers;
+    }
+
+    const updatedProject = await project.save();
+    res.json(updatedProject);
+});
+
+// @desc    Delete a project
+// @route   DELETE /api/projects/:id
+// @access  Private/Admin
+const deleteProject = asyncHandler(async (req, res) => {
+    const project = await Project.findById(req.params.id);
+
+    if (!project) {
+        res.status(404);
+        throw new Error('Project not found');
+    }
+
+    const spaces = await Space.find({ project: project._id }).select('_id');
+    const spaceIds = spaces.map((space) => space._id);
+
+    await Promise.all([
+        Task.deleteMany({ project: project._id }),
+        Sprint.deleteMany({ project: project._id }),
+        Epic.deleteMany({ project: project._id }),
+        ActivityLog.deleteMany({ project: project._id }),
+        Team.updateMany({}, { $pull: { projects: project._id } }),
+        Notification.deleteMany({
+            $or: [
+                { entityType: 'project', entityId: project._id },
+                { 'metadata.projectId': project._id },
+            ],
+        }),
+    ]);
+
+    if (spaceIds.length > 0) {
+        await Promise.all([
+            SpaceContent.deleteMany({ space: { $in: spaceIds } }),
+            SpaceMember.deleteMany({ space: { $in: spaceIds } }),
+            SpaceComment.deleteMany({ space: { $in: spaceIds } }),
+            SpaceActivity.deleteMany({ space: { $in: spaceIds } }),
+            Space.deleteMany({ _id: { $in: spaceIds } }),
+        ]);
+    }
+
+    await project.deleteOne();
+    res.json({ message: 'Project deleted successfully' });
+});
+
 // @desc    Get project statistics for dashboard
 // @route   GET /api/projects/:id/stats
 // @access  Private
 const getProjectStats = asyncHandler(async (req, res) => {
     const projectId = req.params.id;
-    console.log(`\n📊 Loading stats for project: ${projectId}`);
+    const { sprintId } = req.query;
+    console.log(`\n📊 Loading stats for project: ${projectId} (Sprint: ${sprintId || 'default'})`);
 
-    // Get active sprint
-    const activeSprint = await Sprint.findOne({
-        project: projectId,
-        status: 'active'
-    });
-    
-    if (activeSprint) {
-        console.log(`✅ Active Sprint: ${activeSprint.name} (${activeSprint._id})`);
-    } else {
-        console.log(`⚠️ No active sprint found for this project`);
+    // Get specific sprint if requested, otherwise active sprint
+    let targetSprint = null;
+    if (sprintId && sprintId !== 'general') {
+        targetSprint = await Sprint.findById(sprintId);
+    } else if (!sprintId || sprintId === 'active') {
+        targetSprint = await Sprint.findOne({
+            project: projectId,
+            status: 'active'
+        });
     }
 
     // Get all tasks for this project
-    const tasks = await Task.find({ project: projectId });
+    const allProjectTasks = await Task.find({ project: projectId });
     
-    // If no tasks found with projectId, try alternative filtering (fallback)
-    if (tasks.length === 0) {
-        console.warn(`No tasks found for project ${projectId}. Checking database state...`);
+    // Filter tasks based on selected scope
+    let filteredTasks = allProjectTasks;
+    if (targetSprint) {
+        filteredTasks = allProjectTasks.filter(t => t.sprint && t.sprint.toString() === targetSprint._id.toString());
+        console.log(`✅ Focus Scope: Sprint "${targetSprint.name}"`);
+    } else {
+        console.log(`🌐 Focus Scope: Project-Wide (General)`);
     }
-    
-    const sprintTasks = activeSprint
-        ? tasks.filter(t => t.sprint && t.sprint.toString() === activeSprint._id.toString())
-        : [];
 
     // Calculate metrics
-    const totalSprintPoints = sprintTasks.reduce((acc, t) => acc + (t.storyPoints || 0), 0);
-    const doneSprintPoints = sprintTasks
+    const totalPoints = filteredTasks.reduce((acc, t) => acc + (t.storyPoints || 0), 0);
+    const donePoints = filteredTasks
         .filter(t => t.status === 'done')
         .reduce((acc, t) => acc + (t.storyPoints || 0), 0);
-    const inProgressSprintPoints = sprintTasks
+    const inProgressPoints = filteredTasks
         .filter(t => t.status === 'in_progress')
         .reduce((acc, t) => acc + (t.storyPoints || 0), 0);
 
-    const issuesDone = sprintTasks.filter(t => t.status === 'done').length;
+    const issuesDoneCount = filteredTasks.filter(t => t.status === 'done').length;
 
-    // Days remaining in sprint
+    // Days remaining (only relevant if a sprint is selected)
     let daysRemaining = 0;
-    if (activeSprint && activeSprint.endDate) {
+    if (targetSprint && targetSprint.endDate) {
         const today = new Date();
-        const endDate = new Date(activeSprint.endDate);
+        const endDate = new Date(targetSprint.endDate);
         daysRemaining = Math.max(0, Math.ceil((endDate - today) / (1000 * 60 * 60 * 24)));
     }
 
-    // Velocity from closed sprints
+    // Velocity from closed sprints (always project-wide context or most recent)
     const closedSprints = await Sprint.find({
         project: projectId,
         status: 'closed'
@@ -116,48 +213,82 @@ const getProjectStats = asyncHandler(async (req, res) => {
 
     // Issue status breakdown
     const statusBreakdown = {
-        todo: tasks.filter(t => t.status === 'todo').length,
-        in_progress: tasks.filter(t => t.status === 'in_progress').length,
-        review: tasks.filter(t => t.status === 'review').length,
-        done: tasks.filter(t => t.status === 'done').length
+        todo: filteredTasks.filter(t => t.status === 'todo').length,
+        in_progress: filteredTasks.filter(t => t.status === 'in_progress').length,
+        review: filteredTasks.filter(t => t.status === 'review').length,
+        done: filteredTasks.filter(t => t.status === 'done').length
     };
-    
-    // Ensure we have valid counts
-    const totalIssuesCount = Object.values(statusBreakdown).reduce((a, b) => a + b, 0);
-    console.log(`Project ${projectId}: Found ${tasks.length} total tasks, breakdown:`, statusBreakdown, 'total:', totalIssuesCount);
 
-    // Workload by assignee
+    // Workload by assignee (filtered by scope) — includes task titles
     const workload = [];
-    const assigneeMap = new Map();
-    tasks.filter(t => t.status !== 'done').forEach(task => {
-        task.assignedTo.forEach(userId => {
+    const assigneeMap = new Map(); // userId -> { points, tasks: [title] }
+    filteredTasks.filter(t => t.status !== 'done').forEach(task => {
+        (task.assignedTo || []).forEach(userId => {
+            if (!userId) return;
             const id = userId.toString();
-            assigneeMap.set(id, (assigneeMap.get(id) || 0) + (task.storyPoints || 1));
+            if (!assigneeMap.has(id)) {
+                assigneeMap.set(id, { points: 0, tasks: [] });
+            }
+            const entry = assigneeMap.get(id);
+            entry.points += (task.storyPoints || 1);
+            entry.tasks.push(task.title || 'Untitled Task');
         });
     });
 
-    // Populate workload with user info
-    for (const [userId, points] of assigneeMap) {
+    for (const [userId, data] of assigneeMap) {
         const user = await User.findById(userId).select('fullName');
         if (user) {
-            workload.push({ userId, name: user.fullName, points });
+            workload.push({ userId, name: user.fullName, points: data.points, tasks: data.tasks });
         }
     }
 
+    // Upcoming and Unscheduled (for the whole team/sprint)
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    
+    const fourteenDaysFromNow = new Date();
+    fourteenDaysFromNow.setDate(fourteenDaysFromNow.getDate() + 14);
+    fourteenDaysFromNow.setHours(23, 59, 59, 999);
+    
+    // Filter out 'done' tasks for the upcoming/unscheduled lists
+    const activeFilteredTasks = filteredTasks.filter(t => t.status !== 'done');
+
+    const upcomingTasks = activeFilteredTasks
+        .filter(t => t.dueDate && new Date(t.dueDate) <= fourteenDaysFromNow && new Date(t.dueDate) >= startOfToday)
+        .map(t => ({
+            _id: t._id,
+            key: t.key,
+            title: t.title,
+            dueDate: t.dueDate,
+            priority: t.priority
+        }));
+
+    const unscheduledTasks = activeFilteredTasks
+        .filter(t => !t.dueDate)
+        .map(t => ({
+            _id: t._id,
+            key: t.key,
+            title: t.title,
+            priority: t.priority
+        }));
+
     res.json({
-        sprintProgress: totalSprintPoints > 0 ? Math.round((doneSprintPoints / totalSprintPoints) * 100) : 0,
-        issuesDone: issuesDone, // Include sprint-specific done count as fallback
+        sprintProgress: totalPoints > 0 ? Math.round((donePoints / totalPoints) * 100) : 0,
+        issuesDone: issuesDoneCount,
         daysRemaining,
         velocity,
         statusBreakdown,
         workload,
-        totalStoryPoints: totalSprintPoints,
-        completedStoryPoints: doneSprintPoints,
-        inProgressStoryPoints: inProgressSprintPoints,
-        activeSprint: activeSprint ? {
-            _id: activeSprint._id,
-            name: activeSprint.name,
-            endDate: activeSprint.endDate
+        totalTasks: filteredTasks.length,
+        totalStoryPoints: totalPoints,
+        completedStoryPoints: donePoints,
+        inProgressStoryPoints: inProgressPoints,
+        upcomingTasks,
+        unscheduledTasks,
+        activeSprint: targetSprint ? {
+            _id: targetSprint._id,
+            name: targetSprint.name,
+            endDate: targetSprint.endDate
         } : null
     });
 });
@@ -201,6 +332,8 @@ module.exports = {
     createProject,
     getProjects,
     getProjectById,
+    updateProject,
+    deleteProject,
     getProjectStats,
     getWorkTypes
 };

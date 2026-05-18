@@ -1,7 +1,8 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import io from 'socket.io-client';
 import { useAuth } from './AuthContext';
 import { toast } from 'react-toastify';
+import api from '../services/api';
 
 const ChatContext = createContext();
 
@@ -12,12 +13,29 @@ export const ChatProvider = ({ children }) => {
     const { user } = useAuth();
     const [socket, setSocket] = useState(null);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [channels, setChannels] = useState([]);
+
+    const fetchChannels = useCallback(async () => {
+        try {
+            const res = await api.get('/channels');
+            setChannels(res.data);
+        } catch (err) {
+            console.error("Failed to fetch channels", err);
+        }
+    }, []);
 
     useEffect(() => {
         if (user) {
-            const newSocket = io('http://localhost:5000');
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-            setSocket(newSocket);
+            // Use microtask to avoid synchronous setState in effect
+            Promise.resolve().then(() => fetchChannels());
+        }
+    }, [user, fetchChannels]);
+
+    useEffect(() => {
+        if (user) {
+            const newSocket = io(import.meta.env.VITE_API_URL || '/', { withCredentials: true });
+            // Use microtask to avoid synchronous setState in effect
+            Promise.resolve().then(() => setSocket(newSocket));
 
             newSocket.on('connect', () => {
                 // console.log('Socket Connected:', newSocket.id);
@@ -29,12 +47,32 @@ export const ChatProvider = ({ children }) => {
             newSocket.on('receive_message', (data) => {
                 // If the message is NOT from me, notify
                 if (data.sender._id !== user._id) {
-                    toast.info(`New message from ${data.sender.fullName}: ${data.message.substring(0, 20)}...`);
+                    toast.info(`New message from ${data.sender.fullName || 'someone'}: ${data.message.substring(0, 20)}...`);
                     setUnreadCount(prev => prev + 1);
                 }
             });
 
-            return () => newSocket.close();
+            newSocket.on('channel_created', (newChannel) => {
+                setChannels(prev => {
+                    if (prev.find(c => c._id === newChannel._id)) return prev;
+                    return [newChannel, ...prev];
+                });
+                newSocket.emit('join_room', `channel_${newChannel._id}`);
+            });
+
+            newSocket.on('channel_updated', (updatedChannel) => {
+                setChannels(prev => prev.map(c => c._id === updatedChannel._id ? updatedChannel : c));
+            });
+
+            newSocket.on('channel_deleted', ({ channelId }) => {
+                setChannels(prev => prev.filter(c => c._id !== channelId));
+            });
+
+            return () => {
+                if (newSocket) {
+                    newSocket.disconnect();
+                }
+            };
         }
     }, [user]);
 
@@ -51,7 +89,16 @@ export const ChatProvider = ({ children }) => {
     };
 
     return (
-        <ChatContext.Provider value={{ socket, sendMessage, joinRoom, unreadCount, setUnreadCount }}>
+        <ChatContext.Provider value={{
+            socket,
+            sendMessage,
+            joinRoom,
+            unreadCount,
+            setUnreadCount,
+            channels,
+            setChannels,
+            fetchChannels
+        }}>
             {children}
         </ChatContext.Provider>
     );

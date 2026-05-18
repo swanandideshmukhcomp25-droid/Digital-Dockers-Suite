@@ -1,10 +1,14 @@
 import { Card, Tabs, Typography, Empty, Badge } from 'antd';
 import { CalendarOutlined } from '@ant-design/icons';
 import { differenceInDays, parseISO } from 'date-fns';
+import { useThemeMode } from '../../context/ThemeContext';
 
 const { Text } = Typography;
 
 const UpcomingWorkCard = ({ upcomingTasks, unscheduledTasks }) => {
+    const { mode } = useThemeMode();
+    const isDark = mode === 'dark';
+
     const getDaysUntilDue = (dueDate) => {
         try {
             return differenceInDays(parseISO(dueDate), new Date());
@@ -25,7 +29,7 @@ const UpcomingWorkCard = ({ upcomingTasks, unscheduledTasks }) => {
         <div
             style={{
                 padding: '6px 0',
-                borderBottom: '1px solid #f0f0f0',
+                borderBottom: `1px solid ${isDark ? '#30363d' : '#f0f0f0'}`,
                 cursor: 'pointer',
                 transition: 'background 0.2s',
                 display: 'flex',
@@ -37,15 +41,15 @@ const UpcomingWorkCard = ({ upcomingTasks, unscheduledTasks }) => {
                 marginLeft: '-6px',
                 marginRight: '-6px'
             }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9f9f9'}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDark ? 'rgba(255,255,255,0.06)' : '#f9f9f9'}
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
         >
             <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Text 
-                        style={{ 
-                            fontSize: '11px', 
-                            fontWeight: 600, 
+                    <Text
+                        style={{
+                            fontSize: '11px',
+                            fontWeight: 600,
                             color: '#0052cc',
                             minWidth: '55px',
                             flexShrink: 0
@@ -53,9 +57,9 @@ const UpcomingWorkCard = ({ upcomingTasks, unscheduledTasks }) => {
                     >
                         {task.key || 'TASK'}
                     </Text>
-                    <Text 
-                        ellipsis 
-                        style={{ fontSize: '12px', color: '#262626', flex: 1 }}
+                    <Text
+                        ellipsis
+                        style={{ fontSize: '12px', color: isDark ? '#e6edf3' : '#262626', flex: 1 }}
                     >
                         {task.title}
                     </Text>
@@ -98,14 +102,14 @@ const UpcomingWorkCard = ({ upcomingTasks, unscheduledTasks }) => {
                             ))}
                         </div>
                     ) : (
-                        <div style={{ 
-                            textAlign: 'center', 
+                        <div style={{
+                            textAlign: 'center',
                             padding: '12px 0',
                             color: '#8c8c8c'
                         }}>
                             <CalendarOutlined style={{ fontSize: '20px', marginBottom: 6, opacity: 0.35, display: 'block' }} />
                             <Text type="secondary" style={{ fontSize: '11px', display: 'block' }}>
-                                No upcoming issues
+                                No deadlines this week.
                             </Text>
                         </div>
                     )}
@@ -128,8 +132,8 @@ const UpcomingWorkCard = ({ upcomingTasks, unscheduledTasks }) => {
                             ))}
                         </div>
                     ) : (
-                        <div style={{ 
-                            textAlign: 'center', 
+                        <div style={{
+                            textAlign: 'center',
                             padding: '12px 0',
                             color: '#8c8c8c'
                         }}>
@@ -155,14 +159,15 @@ const UpcomingWorkCard = ({ upcomingTasks, unscheduledTasks }) => {
                 </div>
             }
             style={{
-                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                boxShadow: isDark ? 'none' : '0 2px 8px rgba(0,0,0,0.06)',
                 borderRadius: 8,
-                border: '1px solid #f0f0f0'
+                border: `1px solid ${isDark ? '#30363d' : '#f0f0f0'}`,
+                background: isDark ? '#161b22' : '#fff',
             }}
-            bodyStyle={{ padding: '10px' }}
+            styles={{ body: { padding: '10px' } }}
         >
-            <Tabs 
-                items={tabItems} 
+            <Tabs
+                items={tabItems}
                 size="small"
                 tabBarStyle={{
                     marginBottom: '8px'

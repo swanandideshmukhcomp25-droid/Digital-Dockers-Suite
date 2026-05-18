@@ -1,4 +1,4 @@
-import { Drawer, Typography, Descriptions, Tag, Space, Avatar, Divider, Tabs, Button, Input, List, message, Select, Grid, Card, Timeline, Tooltip, Empty, Popconfirm, Spin, Modal } from 'antd';
+import { Drawer, Typography, Descriptions, Tag, Space, Avatar, Divider, Tabs, Button, Input, message, Select, Grid, Card, Timeline, Tooltip, Empty, Popconfirm, Spin, Modal } from 'antd';
 import {
     CloseOutlined,
     LinkOutlined,
@@ -71,11 +71,8 @@ const IssueDetailDrawer = ({ open, onClose, issue }) => {
     const [currentIssue, setCurrentIssue] = useState(issue);
     const [comment, setComment] = useState('');
     const [sending, setSending] = useState(false);
-    const [users, setUsers] = useState([]);
-    const [updating, setUpdating] = useState(false);
     const [loadingField, setLoadingField] = useState(null);
-    const [aiLoading, setAiLoading] = useState(false);
-    const [aiInsights, setAiInsights] = useState(null);
+    const [users, setUsers] = useState([]);
     const screens = useBreakpoint();
     const isMobile = !screens.sm;
     const originalIssueRef = useRef(issue);
@@ -121,7 +118,7 @@ const IssueDetailDrawer = ({ open, onClose, issue }) => {
 
         // Save original state for rollback
         const originalValue = currentIssue[field];
-        
+
         // Optimistic update: update UI immediately
         setCurrentIssue(prev => ({
             ...prev,
@@ -133,10 +130,10 @@ const IssueDetailDrawer = ({ open, onClose, issue }) => {
 
         try {
             // API call in background
-            const updated = await taskService.updateTask(currentIssue._id, { 
-                [field]: value 
+            const updated = await taskService.updateTask(currentIssue._id, {
+                [field]: value
             });
-            
+
             // Sync with server response
             setCurrentIssue(updated);
             message.success(`${field} updated`);
@@ -163,7 +160,7 @@ const IssueDetailDrawer = ({ open, onClose, issue }) => {
      */
     const handleAddComment = async () => {
         if (!comment.trim()) return;
-        
+
         setSending(true);
         try {
             // Call API to add comment
@@ -197,113 +194,7 @@ const IssueDetailDrawer = ({ open, onClose, issue }) => {
         }
     };
 
-    /**
-     * ========================================================================
-     * AI HOOKS - Hackathon Differentiator
-     * ========================================================================
-     * TODO: Replace these with actual OpenAI API calls
-     * Endpoints:
-     * - POST /api/ai/summarize-issue (Claude/GPT-4)
-     * - POST /api/ai/suggest-action (Prompt engineering)
-     * - POST /api/ai/detect-risk (Heuristics + AI)
-     */
-    const handleAISummarize = async () => {
-        setAiLoading(true);
-        try {
-            // TODO: Implement OpenAI API call
-            // const response = await fetch('/api/ai/summarize-issue', {
-            //     method: 'POST',
-            //     headers: { 'Content-Type': 'application/json' },
-            //     body: JSON.stringify({ 
-            //         title: currentIssue.title,
-            //         description: currentIssue.description,
-            //         comments: currentIssue.comments
-            //     })
-            // });
-            // const data = await response.json();
 
-            // Mock response for demo
-            const mockSummary = `${currentIssue.title} is a ${currentIssue.issueType} with ${currentIssue.priority} priority. Currently ${currentIssue.status}. Assigned to ${currentIssue.assignedTo?.map(a => a.fullName).join(', ') || 'nobody'}.`;
-
-            setAiInsights({
-                summary: mockSummary,
-                timestamp: new Date().toISOString()
-            });
-            message.success('AI summary generated');
-        } catch (error) {
-            console.error('AI error:', error);
-            message.error('Failed to generate AI summary');
-        } finally {
-            setAiLoading(false);
-        }
-    };
-
-    const handleAISuggestAction = async () => {
-        setAiLoading(true);
-        try {
-            // TODO: Implement OpenAI API call
-            // const response = await fetch('/api/ai/suggest-action', { ... });
-            
-            const mockAction = currentIssue.status === 'in_progress' 
-                ? 'Move to "In Review" for team validation'
-                : currentIssue.status === 'todo'
-                ? 'Assign to team member and move to "In Progress"'
-                : currentIssue.status === 'review'
-                ? 'Fix issues identified in review, then move to "Done"'
-                : 'Create new issue for follow-up work';
-
-            setAiInsights(prev => ({
-                ...prev,
-                nextAction: mockAction,
-                timestamp: new Date().toISOString()
-            }));
-            message.success('AI suggestion generated');
-        } catch (error) {
-            console.error('AI error:', error);
-            message.error('Failed to generate suggestion');
-        } finally {
-            setAiLoading(false);
-        }
-    };
-
-    const handleAIDetectRisk = async () => {
-        setAiLoading(true);
-        try {
-            // TODO: Implement OpenAI API call with risk detection heuristics
-            // Check for:
-            // - High priority + no assignee
-            // - Overdue or approaching due date
-            // - Dependencies missing
-            // - Blocked by other issues
-            // - Story points too high (> 13)
-
-            const risks = [];
-            if (currentIssue.priority === 'critical' && !currentIssue.assignedTo?.length) {
-                risks.push('🚨 Critical priority but unassigned');
-            }
-            if (currentIssue.storyPoints > 13) {
-                risks.push('⚠️ Story points too high - consider breaking down');
-            }
-            if (currentIssue.dueDate && new Date(currentIssue.dueDate) < new Date()) {
-                risks.push('⏰ Past due date');
-            }
-            if (!currentIssue.description) {
-                risks.push('📝 Missing detailed description');
-            }
-
-            setAiInsights(prev => ({
-                ...prev,
-                risks: risks.length > 0 ? risks : ['✅ No risks detected'],
-                timestamp: new Date().toISOString()
-            }));
-            message.success('AI risk analysis complete');
-        } catch (error) {
-            console.error('AI error:', error);
-            message.error('Failed to analyze risks');
-        } finally {
-            setAiLoading(false);
-        }
-    };
 
     // Delete handler - only for creator or admin
     const canDelete = user?.role === 'admin' ||
@@ -498,11 +389,11 @@ const IssueDetailDrawer = ({ open, onClose, issue }) => {
                                                 />
                                                 {comment && (
                                                     <div style={{ marginTop: 8 }}>
-                                                        <Button 
-                                                            type="primary" 
-                                                            size="small" 
-                                                            onClick={handleAddComment} 
-                                                            loading={sending} 
+                                                        <Button
+                                                            type="primary"
+                                                            size="small"
+                                                            onClick={handleAddComment}
+                                                            loading={sending}
                                                             style={{ marginRight: 8 }}
                                                         >
                                                             {sending ? 'Posting...' : 'Post'}
@@ -512,35 +403,32 @@ const IssueDetailDrawer = ({ open, onClose, issue }) => {
                                                 )}
                                             </div>
                                         </div>
-                                        
+
                                         {/* Comments List */}
-                                        <List
-                                            itemLayout="horizontal"
-                                            dataSource={currentIssue.comments || []}
-                                            locale={{ emptyText: 'No comments yet. Start the conversation!' }}
-                                            renderItem={(item) => (
-                                                <List.Item style={{ paddingLeft: 0, paddingRight: 0 }}>
-                                                    <List.Item.Meta
-                                                        avatar={<Avatar size="small" style={{ backgroundColor: '#5E6C84' }}>
+                                        <div className="comments-list">
+                                            {(!currentIssue.comments || currentIssue.comments.length === 0) ? (
+                                                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No comments yet. Start the conversation!" />
+                                            ) : (
+                                                currentIssue.comments.map((item) => (
+                                                    <div key={item._id} style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+                                                        <Avatar size="small" style={{ backgroundColor: '#5E6C84', flexShrink: 0 }}>
                                                             {item.user?.fullName?.[0] || 'U'}
-                                                        </Avatar>}
-                                                        title={
-                                                            <Space size="small">
+                                                        </Avatar>
+                                                        <div style={{ flex: 1 }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                                                                 <Text strong>{item.user?.fullName || 'Unknown'}</Text>
                                                                 <Text type="secondary" style={{ fontSize: 11 }}>
                                                                     {formatRelativeTime(item.timestamp)}
                                                                 </Text>
-                                                            </Space>
-                                                        }
-                                                        description={
-                                                            <div style={{ marginTop: 4, color: '#262626', whiteSpace: 'pre-wrap' }}>
+                                                            </div>
+                                                            <div style={{ color: '#262626', whiteSpace: 'pre-wrap', fontSize: 14 }}>
                                                                 {item.text}
                                                             </div>
-                                                        }
-                                                    />
-                                                </List.Item>
+                                                        </div>
+                                                    </div>
+                                                ))
                                             )}
-                                        />
+                                        </div>
                                     </>
                                 ),
                             },
@@ -561,7 +449,7 @@ const IssueDetailDrawer = ({ open, onClose, issue }) => {
                                 key: '3',
                                 label: 'Time Logs',
                                 children: (
-                                    <WorkLogPanel 
+                                    <WorkLogPanel
                                         workItemId={currentIssue._id}
                                         onTimeUpdated={() => {
                                             // Refresh issue data if needed
@@ -602,7 +490,7 @@ const IssueDetailDrawer = ({ open, onClose, issue }) => {
                         <Descriptions column={1} layout="horizontal" items={items} size="small" />
                         <Divider />
                         <div style={{ fontSize: 12, color: '#6B778C' }}>
-                            <Space direction="vertical" size={0}>
+                            <Space orientation="vertical" size={0}>
                                 <Text type="secondary">Created {currentIssue.createdAt ? new Date(currentIssue.createdAt).toLocaleDateString() : 'unknown'}</Text>
                                 <Text type="secondary">
                                     Updated {currentIssue.updatedAt ? formatRelativeTime(currentIssue.updatedAt) : 'unknown'}

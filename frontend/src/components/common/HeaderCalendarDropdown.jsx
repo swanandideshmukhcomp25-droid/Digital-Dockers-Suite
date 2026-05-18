@@ -1,30 +1,76 @@
-import React, { useState, useMemo } from 'react';
-import { Dropdown, Button, Card, Tag, Empty, Space, List, Badge, Tooltip } from 'antd';
+import React, { useState, useMemo, useCallback } from 'react';
+import { Dropdown, Button, Tag, Empty, Badge, Tooltip, Spin } from 'antd';
 import { CalendarOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
+import { useProject } from '../../context/ProjectContext';
+import taskService from '../../services/taskService';
+import api from '../../services/api';
 import './HeaderCalendarDropdown.css';
 
 const HeaderCalendarDropdown = () => {
     const navigate = useNavigate();
+    const { currentProject } = useProject();
     const [selectedDate, setSelectedDate] = useState(dayjs());
+    const [open, setOpen] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [workItems, setWorkItems] = useState([]);
 
-    // Mock work items for today and upcoming
-    const workItems = [
-        { id: 1, date: dayjs(), title: 'Complete API Integration', priority: 'high', status: 'in-progress' },
-        { id: 2, date: dayjs(), title: 'Code Review Sprint Tasks', priority: 'medium', status: 'pending' },
-        { id: 3, date: dayjs().add(1, 'day'), title: 'Frontend Testing', priority: 'high', status: 'pending' },
-        { id: 4, date: dayjs().add(2, 'days'), title: 'Database Optimization', priority: 'medium', status: 'pending' },
-        { id: 5, date: dayjs().add(3, 'days'), title: 'Team Standup', priority: 'low', status: 'pending' }
-    ];
+    const fetchDynamicItems = useCallback(async () => {
+        setLoading(true);
+        try {
+            const taskFilters = currentProject?._id ? { projectId: currentProject._id } : {};
+            const [tasksResponse, meetingsResponse] = await Promise.all([
+                taskService.getTasks(taskFilters),
+                api.get('/meetings?type=upcoming'),
+            ]);
+
+            const tasks = Array.isArray(tasksResponse?.tasks) ? tasksResponse.tasks : (Array.isArray(tasksResponse) ? tasksResponse : []);
+            const meetings = Array.isArray(meetingsResponse?.data) ? meetingsResponse.data : [];
+
+            const normalizedTasks = tasks
+                .filter((task) => task?.dueDate)
+                .map((task) => ({
+                    id: `task-${task._id}`,
+                    date: dayjs(task.dueDate),
+                    title: task.title || task.key || 'Untitled Task',
+                    priority: task.priority || 'medium',
+                    status: task.status === 'done' ? 'completed' : task.status === 'in_progress' ? 'in-progress' : 'pending',
+                    source: 'task',
+                }))
+                .filter((item) => item.date.isValid());
+
+            const normalizedMeetings = meetings
+                .filter((meeting) => meeting?.scheduledAt)
+                .map((meeting) => ({
+                    id: `meeting-${meeting._id}`,
+                    date: dayjs(meeting.scheduledAt),
+                    title: meeting.title || 'Meeting',
+                    priority: 'medium',
+                    status: meeting.status === 'completed' ? 'completed' : meeting.status === 'in_progress' ? 'in-progress' : 'pending',
+                    source: 'meeting',
+                }))
+                .filter((item) => item.date.isValid());
+
+            setWorkItems([...normalizedTasks, ...normalizedMeetings]);
+        } catch (error) {
+            console.error('Failed to fetch calendar items', error);
+            setWorkItems([]);
+        } finally {
+            setLoading(false);
+        }
+    }, [currentProject?._id]);
 
     const todayWorkItems = useMemo(() => {
         return workItems.filter(item => item.date.isSame(dayjs(), 'day'));
-    }, []);
+    }, [workItems]);
 
     const upcomingWorkItems = useMemo(() => {
-        return workItems.filter(item => item.date.isAfter(dayjs(), 'day')).slice(0, 3);
-    }, []);
+        return workItems
+            .filter(item => item.date.isAfter(dayjs(), 'day'))
+            .sort((a, b) => a.date.valueOf() - b.date.valueOf())
+            .slice(0, 3);
+    }, [workItems]);
 
     const getPriorityColor = (priority) => {
         const colors = { high: 'red', medium: 'orange', low: 'green' };
@@ -116,29 +162,34 @@ const HeaderCalendarDropdown = () => {
                     <ClockCircleOutlined /> Today
                     <Badge count={todayWorkItems.length} style={{ backgroundColor: '#1890ff' }} />
                 </div>
-                {todayWorkItems.length > 0 ? (
-                    <List
-                        size="small"
-                        dataSource={todayWorkItems}
-                        renderItem={(item) => (
-                            <List.Item
-                                style={{ padding: '6px 8px', fontSize: '12px' }}
+                {loading ? (
+                    <div style={{ textAlign: 'center', padding: '12px 0' }}><Spin size="small" /></div>
+                ) : todayWorkItems.length > 0 ? (
+                    <div className="calendar-work-list">
+                        {todayWorkItems.map((item) => (
+                            <div
+                                key={item.id}
+                                className="calendar-work-item"
                                 onClick={() => navigate('/dashboard/work-planner')}
+                                style={{ cursor: 'pointer', padding: '8px 4px' }}
                             >
                                 <Tooltip title={item.title}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>
+                                    <div className="calendar-work-row">
                                         <span className="status-icon">{getStatusIcon(item.status)}</span>
-                                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        <span className="calendar-work-title">
                                             {item.title}
                                         </span>
-                                        <Tag color={getPriorityColor(item.priority)} style={{ fontSize: '10px', margin: 0 }}>
+                                        <Tag color="blue" className="calendar-priority-tag">
+                                            {item.source}
+                                        </Tag>
+                                        <Tag color={getPriorityColor(item.priority)} className="calendar-priority-tag">
                                             {item.priority}
                                         </Tag>
                                     </div>
                                 </Tooltip>
-                            </List.Item>
-                        )}
-                    />
+                            </div>
+                        ))}
+                    </div>
                 ) : (
                     <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No work today" style={{ margin: '8px 0' }} />
                 )}
@@ -150,28 +201,31 @@ const HeaderCalendarDropdown = () => {
                     <CalendarOutlined /> Upcoming
                     <Badge count={upcomingWorkItems.length} style={{ backgroundColor: '#faad14' }} />
                 </div>
-                {upcomingWorkItems.length > 0 ? (
-                    <List
-                        size="small"
-                        dataSource={upcomingWorkItems}
-                        renderItem={(item) => (
-                            <List.Item
-                                style={{ padding: '6px 8px', fontSize: '11px' }}
+                {loading ? (
+                    <div style={{ textAlign: 'center', padding: '12px 0' }}><Spin size="small" /></div>
+                ) : upcomingWorkItems.length > 0 ? (
+                    <div className="calendar-work-list">
+                        {upcomingWorkItems.map((item) => (
+                            <div
+                                key={item.id}
+                                className="calendar-work-item compact"
                                 onClick={() => navigate('/dashboard/work-planner')}
+                                style={{ cursor: 'pointer', padding: '8px 4px' }}
                             >
                                 <Tooltip title={`${item.date.format('MMM DD')} - ${item.title}`}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>
-                                        <Tag color="blue" style={{ fontSize: '10px', margin: 0, minWidth: '50px' }}>
+                                    <div className="calendar-work-row">
+                                        <Tag color="blue" className="calendar-date-tag">
                                             {item.date.format('MMM DD')}
                                         </Tag>
-                                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        <Tag color="geekblue" className="calendar-priority-tag">{item.source}</Tag>
+                                        <span className="calendar-work-title">
                                             {item.title}
                                         </span>
                                     </div>
                                 </Tooltip>
-                            </List.Item>
-                        )}
-                    />
+                            </div>
+                        ))}
+                    </div>
                 ) : (
                     <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No upcoming work" style={{ margin: '8px 0' }} />
                 )}
@@ -196,31 +250,19 @@ const HeaderCalendarDropdown = () => {
             popupRender={() => calendarContent}
             trigger={['click']}
             placement="bottomRight"
+            open={open}
+            onOpenChange={(nextOpen) => {
+                setOpen(nextOpen);
+                if (nextOpen) {
+                    fetchDynamicItems();
+                }
+            }}
         >
             <Button
                 type="text"
-                icon={<CalendarOutlined style={{ fontSize: '18px' }} />}
+                icon={<CalendarOutlined className="header-calendar-trigger-icon" />}
                 title="Work Planner"
-                style={{
-                    height: '40px',
-                    width: '40px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderRadius: '6px',
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                    color: '#262626'
-                }}
-                onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(24, 144, 255, 0.08)';
-                    e.currentTarget.style.color = '#1890ff';
-                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(24, 144, 255, 0.12)';
-                }}
-                onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.color = '#262626';
-                    e.currentTarget.style.boxShadow = 'none';
-                }}
+                className="header-calendar-trigger"
             >
                 {todayWorkItems.length > 0 && (
                     <Badge

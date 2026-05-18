@@ -2,6 +2,14 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { CssBaseline } from '@mui/material';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { App as AntApp, message } from 'antd';
+
+// Configure Ant Design message notifications
+message.config({
+  duration: 4,
+  maxCount: 3,
+  top: undefined,
+});
 
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -14,9 +22,10 @@ import DashboardHome from './components/dashboards/DashboardHome';
 import NotFoundPage from './pages/NotFoundPage';
 import TasksPage from './components/tasks/TasksPage';
 import BacklogPage from './components/backlog/BacklogPage';
-import RoadmapPage from './components/dashboards/RoadmapPage';
+import RoadmapPage from './pages/RoadmapPage';
 import MeetingsPage from './components/meetings/MeetingsPage';
 import EmailGeneratorPage from './pages/apps/EmailGeneratorPage';
+import PPTGeneratorPage from './pages/apps/PPTGeneratorPage';
 import DocumentManager from './components/documents/DocumentManager';
 import WellnessCheckin from './components/wellness/WellnessCheckin';
 import ReportDashboard from './components/reports/ReportDashboard';
@@ -30,6 +39,8 @@ import ProjectsListPage from './pages/ProjectsListPage';
 import Spaces from './components/spaces/Spaces';
 import CalendarWorkPlanner from './components/CalendarWorkPlanner';
 import TeamManagement from './components/admin/TeamManagement';
+import TechDebtPage from './pages/TechDebtPage';
+import AIArchitectPage from './pages/AIArchitectPage';
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children, roles = [] }) => {
@@ -48,20 +59,33 @@ const ProtectedRoute = ({ children, roles = [] }) => {
   return children;
 };
 
+// Public Route Wrapper (redirect logged-in users to dashboard)
+const PublicRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) return <div>Loading...</div>;
+
+  if (user) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
+};
+
 function App() {
   return (
     <ThemeProvider>
       <CssBaseline />
-      <AuthProvider>
-        <ChatProvider>
-          <ProjectProvider>
-            <Router>
-              <Routes>
-                {/* ... existing routes ... */}
+      <AntApp>
+        <AuthProvider>
+          <ChatProvider>
+            <ProjectProvider>
+              <Router>
+                <Routes>
                 {/* Public Routes */}
-                <Route path="/" element={<LandingPage />} />
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/register" element={<RegisterPage />} />
+                <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
+                <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+                <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
                 <Route path="/auth/google/callback" element={<GoogleCallback />} />
 
                 {/* Protected Dashboard Routes */}
@@ -79,6 +103,7 @@ function App() {
                   <Route path="roadmap" element={<RoadmapPage />} />
                   <Route path="meetings" element={<MeetingsPage />} />
                   <Route path="email-generator" element={<EmailGeneratorPage />} />
+                  <Route path="ppt-generator" element={<PPTGeneratorPage />} />
                   <Route path="documents" element={<DocumentManager />} />
                   <Route path="wellness" element={<WellnessCheckin />} />
                   <Route path="reports" element={<ReportDashboard />} />
@@ -89,8 +114,8 @@ function App() {
                   <Route path="projects" element={<ProjectsListPage />} />
                   <Route path="spaces" element={<Spaces />} />
                   <Route path="work-planner" element={<CalendarWorkPlanner />} />
-                  <Route path="slide-generator" element={<SlideGeneratorPage />} />
-                  <Route path="presentations/:id" element={<PresentationViewer />} />
+                  <Route path="tech-debt" element={<TechDebtPage />} />
+                  <Route path="ai-architect" element={<AIArchitectPage />} />
                   <Route path="team-management" element={
                     <ProtectedRoute roles={['admin']}>
                       <TeamManagement />
@@ -100,12 +125,22 @@ function App() {
 
                 {/* Fallback */}
                 <Route path="*" element={<NotFoundPage />} />
-              </Routes>
-            </Router>
-          </ProjectProvider>
-        </ChatProvider>
-      </AuthProvider>
-      <ToastContainer position="top-right" />
+                </Routes>
+              </Router>
+            </ProjectProvider>
+          </ChatProvider>
+        </AuthProvider>
+        <ToastContainer
+          position="bottom-right"
+          autoClose={4000}
+          hideProgressBar={false}
+          newestOnTop
+          closeOnClick
+          pauseOnHover
+          draggable
+          theme="colored"
+        />
+      </AntApp>
     </ThemeProvider>
   );
 }

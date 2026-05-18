@@ -4,7 +4,7 @@ import {
     TextField, Button, Grid, Avatar, IconButton, Tabs, Tab,
     Select, MenuItem, FormControl, InputLabel, Alert
 } from '@mui/material';
-import { PhotoCamera, Save, Event, CheckCircle, Warning } from '@mui/icons-material';
+import { PhotoCamera, Save, Event, CheckCircle, Warning, Lock } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import { useThemeMode } from '../../context/ThemeContext';
 import { toast } from 'react-toastify';
@@ -185,16 +185,17 @@ const SettingsPage = () => {
                         </Box>
 
                         <Grid container spacing={3}>
-                            <Grid item xs={12} md={6}>
+                            <Grid size={{ xs: 12, md: 6 }}>
                                 <TextField
                                     fullWidth
                                     label="Full Name"
                                     name="fullName"
                                     value={profileData.fullName}
                                     onChange={handleProfileChange}
+                                    sx={{ maxWidth: 400 }}
                                 />
                             </Grid>
-                            <Grid item xs={12} md={6}>
+                            <Grid size={{ xs: 12, md: 6 }}>
                                 <TextField
                                     fullWidth
                                     label="Email"
@@ -203,9 +204,15 @@ const SettingsPage = () => {
                                     onChange={handleProfileChange}
                                     disabled
                                     helperText="Email cannot be changed"
+                                    sx={{ maxWidth: 400 }}
+                                    slotProps={{
+                                        input: {
+                                            startAdornment: <Lock sx={{ mr: 1, fontSize: 18, color: 'text.disabled' }} />
+                                        }
+                                    }}
                                 />
                             </Grid>
-                            <Grid item xs={12} md={6}>
+                            <Grid size={{ xs: 12, md: 6 }}>
                                 <TextField
                                     fullWidth
                                     label="Department"
@@ -214,16 +221,17 @@ const SettingsPage = () => {
                                     onChange={handleProfileChange}
                                 />
                             </Grid>
-                            <Grid item xs={12} md={6}>
+                            <Grid size={{ xs: 12, md: 6 }}>
                                 <TextField
                                     fullWidth
                                     label="Phone Number"
                                     name="phone"
                                     value={profileData.phone}
                                     onChange={handleProfileChange}
+                                    sx={{ maxWidth: 400 }}
                                 />
                             </Grid>
-                            <Grid item xs={12}>
+                            <Grid size={{ xs: 12 }}>
                                 <TextField
                                     fullWidth
                                     label="Bio"
@@ -235,7 +243,7 @@ const SettingsPage = () => {
                                     placeholder="Tell us about yourself..."
                                 />
                             </Grid>
-                            <Grid item xs={12}>
+                            <Grid size={{ xs: 12 }}>
                                 <Button
                                     variant="contained"
                                     startIcon={<Save />}
@@ -384,7 +392,7 @@ const SettingsPage = () => {
                             Language & Region
                         </Typography>
                         <Grid container spacing={3}>
-                            <Grid item xs={12} md={6}>
+                            <Grid size={{ xs: 12, md: 6 }}>
                                 <FormControl fullWidth>
                                     <InputLabel>Language</InputLabel>
                                     <Select defaultValue="en" label="Language">
@@ -394,7 +402,7 @@ const SettingsPage = () => {
                                     </Select>
                                 </FormControl>
                             </Grid>
-                            <Grid item xs={12} md={6}>
+                            <Grid size={{ xs: 12, md: 6 }}>
                                 <FormControl fullWidth>
                                     <InputLabel>Timezone</InputLabel>
                                     <Select defaultValue="utc" label="Timezone">
@@ -418,7 +426,7 @@ const SettingsPage = () => {
                             Password must be at least 8 characters long and include uppercase, lowercase, and numbers.
                         </Alert>
                         <Grid container spacing={3}>
-                            <Grid item xs={12}>
+                            <Grid size={{ xs: 12 }}>
                                 <TextField
                                     fullWidth
                                     type="password"
@@ -428,7 +436,7 @@ const SettingsPage = () => {
                                     onChange={handleSecurityChange}
                                 />
                             </Grid>
-                            <Grid item xs={12} md={6}>
+                            <Grid size={{ xs: 12, md: 6 }}>
                                 <TextField
                                     fullWidth
                                     type="password"
@@ -438,7 +446,7 @@ const SettingsPage = () => {
                                     onChange={handleSecurityChange}
                                 />
                             </Grid>
-                            <Grid item xs={12} md={6}>
+                            <Grid size={{ xs: 12, md: 6 }}>
                                 <TextField
                                     fullWidth
                                     type="password"
@@ -448,7 +456,7 @@ const SettingsPage = () => {
                                     onChange={handleSecurityChange}
                                 />
                             </Grid>
-                            <Grid item xs={12}>
+                            <Grid size={{ xs: 12 }}>
                                 <Button
                                     variant="contained"
                                     color="primary"

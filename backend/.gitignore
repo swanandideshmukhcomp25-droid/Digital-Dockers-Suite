@@ -1,0 +1,4 @@
+# Backend Temp Files
+temp/
+*.pptx
+/node_modules

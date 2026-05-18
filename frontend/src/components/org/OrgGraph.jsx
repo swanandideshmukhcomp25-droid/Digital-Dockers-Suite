@@ -5,12 +5,13 @@ import ReactFlow, {
     Background,
     useNodesState,
     useEdgesState,
-    Position
+    Position,
+    Handle
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import dagre from 'dagre';
-import { Box, Paper, Typography, Avatar, Chip, Tooltip, Skeleton, useTheme } from '@mui/material';
-import { Business, Group, Person, WorkOutline } from '@mui/icons-material';
+import { Box, Paper, Typography, Avatar, Chip, Tooltip, Skeleton, useTheme, TextField, InputAdornment } from '@mui/material';
+import { Business, Group, Person, WorkOutline, Search } from '@mui/icons-material';
 import teamService from '../../services/teamService';
 import GlassCard from '../common/GlassCard';
 
@@ -50,6 +51,7 @@ const getLayoutedElements = (nodes, edges, direction = 'TB') => {
 
 // Company/Workspace node
 const CompanyNode = ({ data }) => {
+    const theme = useTheme();
     return (
         <GlassCard
             sx={{
@@ -74,6 +76,7 @@ const CompanyNode = ({ data }) => {
                     {data.subtitle}
                 </Typography>
             </Box>
+            <Handle type="source" position={Position.Bottom} style={{ background: '#4f46e5', border: `2px solid ${theme.palette.mode === 'dark' ? '#334155' : 'white'}` }} />
         </GlassCard>
     );
 };
@@ -114,6 +117,8 @@ const TeamNode = ({ data }) => {
                         {data.memberCount} members
                     </Typography>
                 </Box>
+                <Handle type="target" position={Position.Top} style={{ background: data.color || '#6554C0', border: `1px solid ${theme.palette.mode === 'dark' ? '#334155' : 'white'}` }} />
+                <Handle type="source" position={Position.Bottom} style={{ background: data.color || '#6554C0', border: `1px solid ${theme.palette.mode === 'dark' ? '#334155' : 'white'}` }} />
             </GlassCard>
         </Tooltip>
     );
@@ -147,7 +152,9 @@ const PersonNode = ({ data }) => {
                     gap: 1.5,
                     borderRadius: 3,
                     border: '1px solid',
-                    borderColor: data.isLead ? '#4f46e5' : 'rgba(255,255,255,0.2)',
+                    borderColor: data.isLead
+                        ? '#4f46e5'
+                        : (theme.palette.mode === 'dark' ? 'rgba(148,163,184,0.4)' : 'rgba(148,163,184,0.35)'),
                     background: theme.palette.mode === 'dark'
                         ? 'linear-gradient(135deg, rgba(30,41,59,0.9) 0%, rgba(15,23,42,0.85) 100%)'
                         : 'linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(248,250,252,0.85) 100%)',
@@ -187,12 +194,14 @@ const PersonNode = ({ data }) => {
                             fontWeight: 600,
                             background: data.isLead
                                 ? 'linear-gradient(to right, #4f46e5, #818cf8)'
-                                : 'rgba(100,100,100,0.2)',
+                                : (theme.palette.mode === 'dark' ? 'rgba(148,163,184,0.22)' : 'rgba(100,100,100,0.12)'),
                             color: data.isLead ? 'white' : 'text.secondary',
                             textTransform: 'uppercase',
                         }}
                     />
                 </Box>
+                <Handle type="target" position={Position.Top} style={{ background: data.isLead ? '#4f46e5' : '#94a3b8', border: `1px solid ${theme.palette.mode === 'dark' ? '#334155' : 'white'}` }} />
+                <Handle type="source" position={Position.Bottom} style={{ background: data.isLead ? '#4f46e5' : '#94a3b8', border: `1px solid ${theme.palette.mode === 'dark' ? '#334155' : 'white'}` }} />
             </GlassCard>
         </Tooltip>
     );
@@ -208,6 +217,7 @@ const OrgGraph = () => {
     const [nodes, setNodes] = useNodesState([]);
     const [edges, setEdges] = useEdgesState([]);
     const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
     const theme = useTheme();
 
     useEffect(() => {
@@ -254,7 +264,7 @@ const OrgGraph = () => {
                         id: `e-company-${teamId}`,
                         source: companyId,
                         target: teamId,
-                        type: 'smoothstep',
+                        type: 'step',
                         style: { stroke: team.color || '#6554C0', strokeWidth: 2 },
                         animated: true
                     });
@@ -279,7 +289,7 @@ const OrgGraph = () => {
                             id: `e-${teamId}-${leadId}`,
                             source: teamId,
                             target: leadId,
-                            type: 'smoothstep',
+                            type: 'step',
                             style: { stroke: '#4f46e5', strokeWidth: 2 },
                             animated: true
                         });
@@ -312,7 +322,7 @@ const OrgGraph = () => {
                             id: `e-${sourceNode}-${memberId}`,
                             source: sourceNode,
                             target: memberId,
-                            type: 'smoothstep',
+                            type: 'step',
                             style: { stroke: theme.palette.text.secondary, strokeWidth: 1.5 }
                         });
                     });
@@ -333,9 +343,30 @@ const OrgGraph = () => {
         fetchOrgData();
     }, [setNodes, setEdges, theme]);
 
-    // Read-only handlers - do nothing
     const onNodesChange = () => { };
     const onEdgesChange = () => { };
+
+    // Filter nodes based on search term by updating opacity
+    const filteredNodes = useMemo(() => {
+        if (!searchTerm) return nodes;
+
+        const lowerTerm = searchTerm.toLowerCase();
+        return nodes.map(node => {
+            const isMatch = 
+                (node.data.name && node.data.name.toLowerCase().includes(lowerTerm)) ||
+                (node.data.fullName && node.data.fullName.toLowerCase().includes(lowerTerm)) ||
+                (node.data.role && node.data.role.toLowerCase().includes(lowerTerm));
+            
+            return {
+                ...node,
+                style: {
+                    ...node.style,
+                    opacity: isMatch ? 1 : 0.2,
+                    transition: 'opacity 0.3s ease'
+                }
+            };
+        });
+    }, [nodes, searchTerm]);
 
     if (loading) {
         return (
@@ -349,7 +380,16 @@ const OrgGraph = () => {
                 }}>
                     Organization Structure
                 </Typography>
-                <Paper sx={{ height: '100%', p: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Paper sx={{
+                    height: '100%',
+                    p: 4,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    bgcolor: 'background.paper'
+                }}>
                     <Box sx={{ textAlign: 'center' }}>
                         <Skeleton variant="circular" width={80} height={80} sx={{ mx: 'auto', mb: 2 }} />
                         <Skeleton variant="text" width={200} sx={{ mx: 'auto' }} />
@@ -371,12 +411,31 @@ const OrgGraph = () => {
                 }}>
                     Organization Structure
                 </Typography>
-                <Chip
-                    icon={<WorkOutline />}
-                    label="View Only"
-                    size="small"
-                    sx={{ bgcolor: 'rgba(100,100,100,0.1)' }}
-                />
+                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                    <TextField
+                        size="small"
+                        placeholder="Search people, roles, teams..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        sx={{ width: 250 }}
+                        InputProps={{
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <Search fontSize="small" />
+                                </InputAdornment>
+                            ),
+                        }}
+                    />
+                    <Chip
+                        icon={<WorkOutline />}
+                        label="View Only"
+                        size="small"
+                        sx={{
+                            bgcolor: theme.palette.mode === 'dark' ? 'rgba(148,163,184,0.18)' : 'rgba(100,100,100,0.1)',
+                            color: 'text.secondary'
+                        }}
+                    />
+                </Box>
             </Box>
             <Paper sx={{
                 height: '100%',
@@ -385,10 +444,12 @@ const OrgGraph = () => {
                 overflow: 'hidden',
                 border: '1px solid',
                 borderColor: 'divider',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+                boxShadow: theme.palette.mode === 'dark'
+                    ? '0 8px 28px rgba(2, 6, 23, 0.55)'
+                    : '0 4px 20px rgba(0,0,0,0.08)'
             }}>
                 <ReactFlow
-                    nodes={nodes}
+                    nodes={filteredNodes}
                     edges={edges}
                     onNodesChange={onNodesChange}
                     onEdgesChange={onEdgesChange}
@@ -405,7 +466,12 @@ const OrgGraph = () => {
                 >
                     <Controls showInteractive={false} />
                     <MiniMap
-                        style={{ borderRadius: 8 }}
+                        style={{
+                            borderRadius: 8,
+                            background: theme.palette.mode === 'dark' ? '#0f172a' : '#f8fafc',
+                            border: `1px solid ${theme.palette.divider}`
+                        }}
+                        maskColor={theme.palette.mode === 'dark' ? 'rgba(15, 23, 42, 0.55)' : 'rgba(248, 250, 252, 0.68)'}
                         nodeColor={(node) => {
                             if (node.type === 'company') return '#4f46e5';
                             if (node.type === 'team') return node.data?.color || '#6554C0';

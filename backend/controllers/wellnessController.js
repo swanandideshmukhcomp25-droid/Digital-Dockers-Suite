@@ -20,7 +20,9 @@ const submitCheckin = asyncHandler(async (req, res) => {
         aiAnalysis: {
             overallScore: 10 - responses.stressLevel, // Simple calculation
             concerns: responses.stressLevel > 5 ? ["High Stress"] : [],
-            recommendations: ["Take a break", "Meditation"],
+            recommendations: responses.stressLevel >= 7
+                ? ["Try a breathing exercise", "Take a short walk", "Talk to someone you trust"]
+                : ["Keep up the good work!", "Stay hydrated"],
             alertLevel
         }
     });
@@ -32,11 +34,46 @@ const submitCheckin = asyncHandler(async (req, res) => {
 // @route   GET /api/wellness/history
 // @access  Private
 const getWellnessHistory = asyncHandler(async (req, res) => {
-    const history = await Wellness.find({ userId: req.user._id }).sort('-createdAt');
+    const history = await Wellness.find({ userId: req.user._id }).sort('-createdAt').limit(10);
     res.status(200).json(history);
+});
+
+// @desc    Complete a wellness journey
+// @route   POST /api/wellness/journey/complete
+// @access  Private
+const completeJourney = asyncHandler(async (req, res) => {
+    const { pathId, completedActivities, moodBefore, moodAfter, results } = req.body;
+
+    // Store journey data in wellness record
+    const journeyData = {
+        userId: req.user._id,
+        checkInType: 'journey',
+        responses: {
+            pathId,
+            completedActivities,
+            moodBefore,
+            moodAfter,
+            journeyResults: results
+        },
+        aiAnalysis: {
+            overallScore: moodAfter || 3,
+            concerns: [],
+            recommendations: ['Great job completing your wellness journey!'],
+            alertLevel: 'none'
+        }
+    };
+
+    const wellness = await Wellness.create(journeyData);
+
+    res.status(201).json({
+        success: true,
+        message: 'Journey completed successfully!',
+        data: wellness
+    });
 });
 
 module.exports = {
     submitCheckin,
-    getWellnessHistory
+    getWellnessHistory,
+    completeJourney
 };

@@ -12,7 +12,7 @@ import useSpaceWebSocket from '../../hooks/useSpaceWebSocket';
  * SpaceEditor Component
  * Main editor with tabs for Notes, Whiteboard, and Mind Map
  */
-const SpaceEditor = ({ space, currentUser, onUpdate }) => {
+const SpaceEditor = ({ space, currentUser }) => {
   const [content, setContent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('notes');
@@ -20,18 +20,34 @@ const SpaceEditor = ({ space, currentUser, onUpdate }) => {
   const [lastSaved, setLastSaved] = useState(null);
 
   // Initialize WebSocket connection
-  const { 
-    isConnected, 
-    activeUsers, 
-    cursors, 
+  const {
+    isConnected,
+    activeUsers,
+    cursors,
     typingUsers,
-    sendUpdate,
-    requestSync 
+    sendUpdate
   } = useSpaceWebSocket(space._id, currentUser._id);
+
+  const loadContent = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get(
+        `/api/spaces/${space._id}`,
+        { withCredentials: true }
+      );
+
+      setContent(response.data.data.content);
+    } catch (error) {
+      message.error('Failed to load space content');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  }, [space._id]);
 
   useEffect(() => {
     loadContent();
-  }, [space._id]);
+  }, [loadContent]);
 
   // Autosave every 30 seconds
   useEffect(() => {
@@ -42,26 +58,10 @@ const SpaceEditor = ({ space, currentUser, onUpdate }) => {
     }, 30000);
 
     return () => clearInterval(autoSaveInterval);
-  }, [content, space._id]);
+  }, [content, handleAutosave]);
 
-  const loadContent = async () => {
-    setLoading(true);
-    try {
-      const response = await axios.get(
-        `/api/spaces/${space._id}`,
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-      );
-      
-      setContent(response.data.data.content);
-    } catch (error) {
-      message.error('Failed to load space content');
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const handleAutosave = async () => {
+  const handleAutosave = React.useCallback(async () => {
     if (!content) return;
 
     try {
@@ -73,11 +73,11 @@ const SpaceEditor = ({ space, currentUser, onUpdate }) => {
           drawingData: content.drawingData,
           mindmapData: content.mindmapData
         },
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+        { withCredentials: true }
       );
-      
+
       setLastSaved(new Date());
-      
+
       // Broadcast update to other users
       sendUpdate({
         contentType: content.contentType,
@@ -90,9 +90,9 @@ const SpaceEditor = ({ space, currentUser, onUpdate }) => {
     } catch (error) {
       console.error('Autosave failed:', error);
     }
-  };
+  }, [content, space._id, sendUpdate]);
 
-  const handleSaveExplicitly = async (updatedContent, editSummary) => {
+  const handleSaveExplicitly = React.useCallback(async (updatedContent, editSummary) => {
     setIsSaving(true);
     try {
       const response = await axios.patch(
@@ -106,13 +106,13 @@ const SpaceEditor = ({ space, currentUser, onUpdate }) => {
           editSummary,
           isMajorVersion: true
         },
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+        { withCredentials: true }
       );
-      
+
       setContent(response.data.data);
       setLastSaved(new Date());
       message.success('Changes saved');
-      
+
       // Broadcast to other users
       sendUpdate({
         ...updatedContent,
@@ -125,7 +125,7 @@ const SpaceEditor = ({ space, currentUser, onUpdate }) => {
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [space._id, sendUpdate]);
 
   if (loading) return <Spin size="large" style={{ display: 'flex', justifyContent: 'center', marginTop: 100 }} />;
 

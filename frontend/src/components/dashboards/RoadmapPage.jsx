@@ -7,11 +7,11 @@ import CreateEpicModal from './CreateEpicModal';
 import EpicTimeline from './EpicTimeline';
 import MonthCard from './MonthCard';
 import MonthlyInsights from './MonthlyInsights';
-import { generateMonthlyProgressData, generateMonthlyAIInsights } from '../../utils/monthlyProgressData';
+import { generateMonthlyProgressData } from '../../utils/monthlyProgressData';
 import './RoadmapPage.css';
 
 const RoadmapPage = () => {
-    const { currentProject } = useProject();
+    const { currentProject, syncTrigger } = useProject();
     const [epics, setEpics] = useState([]);
     const [loading, setLoading] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -19,21 +19,7 @@ const RoadmapPage = () => {
     const [timeRange, setTimeRange] = useState('6months');
     const [isGeneratingAI, setIsGeneratingAI] = useState(false);
     const [monthlyData, setMonthlyData] = useState(null);
-    const [aiInsights, setAiInsights] = useState([]);
     const [activeTab, setActiveTab] = useState('progress'); // 'progress' or 'epics'
-
-    const statusOptions = [
-        { label: 'All Statuses', value: 'all' },
-        { label: 'Planned', value: 'PLANNED' },
-        { label: 'In Progress', value: 'IN_PROGRESS' },
-        { label: 'Done', value: 'DONE' }
-    ];
-
-    const timeRangeOptions = [
-        { label: '6 Months', value: '6months' },
-        { label: '12 Months', value: '12months' },
-        { label: 'All Time', value: 'all' }
-    ];
 
     // Fetch epics
     const fetchEpics = async () => {
@@ -56,9 +42,7 @@ const RoadmapPage = () => {
         // Load monthly progress data
         const data = generateMonthlyProgressData();
         setMonthlyData(data);
-        const insights = generateMonthlyAIInsights(data);
-        setAiInsights(insights);
-    }, [currentProject]);
+    }, [currentProject, syncTrigger]);
 
     // Handle create epic
     const handleCreateEpic = async (epicData) => {
@@ -82,7 +66,7 @@ const RoadmapPage = () => {
         try {
             // Mock AI response - replace with real OpenAI API call in Phase 2
             const aiGeneratedEpics = generateMockAIEpics();
-            
+
             // Add AI-generated epics to the list
             for (const epicData of aiGeneratedEpics) {
                 try {
@@ -348,7 +332,7 @@ const RoadmapPage = () => {
                         )
                     }
                 ]}
-                style={{ background: '#fff' }}
+                style={{ background: 'var(--color-bg-card)' }}
             />
 
             {/* Create Epic Modal */}

@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Select, Spin, Empty, Row, Col, Card, Statistic } from 'antd';
 import { ClockCircleOutlined } from '@ant-design/icons';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { useProject } from '../../context/ProjectContext';
+import { useThemeMode } from '../../context/ThemeContext';
 import taskService from '../../services/taskService';
-import sprintService from '../../services/sprintService';
 import './ScrumBoard.css';
 
 /**
@@ -20,13 +20,14 @@ import './ScrumBoard.css';
  * @component
  */
 const ScrumBoard = () => {
-    const { currentProject, sprints, activeSprint } = useProject();
-    
+    const { currentProject, sprints, activeSprint, selectedSprintId, setSelectedSprintId, syncTrigger } = useProject();
+    const { mode } = useThemeMode();
+    const isDark = mode === 'dark';
+
     // State Management
-    const [selectedSprint, setSelectedSprint] = useState(null);
     const [tasks, setTasks] = useState({});
     const [loading, setLoading] = useState(false);
-    const [refreshTrigger, setRefreshTrigger] = useState(0);
+    const [refreshTrigger] = useState(0);
     const [sprintMetrics, setSprintMetrics] = useState({
         total: 0,
         completed: 0,
@@ -38,57 +39,44 @@ const ScrumBoard = () => {
     const COLUMNS = {
         'TODO': {
             name: 'To Do',
-            color: '#626f86',
-            bgColor: '#f8f9fa',
+            color: isDark ? '#8b949e' : '#626f86',
+            bgColor: isDark ? '#1c2128' : '#f8f9fa',
+            dragBgColor: isDark ? 'rgba(56, 139, 253, 0.14)' : '#deebff',
         },
         'IN_PROGRESS': {
             name: 'In Progress',
-            color: '#0052cc',
-            bgColor: '#f8f9fa',
+            color: isDark ? '#58a6ff' : '#0052cc',
+            bgColor: isDark ? '#1c2128' : '#f8f9fa',
+            dragBgColor: isDark ? 'rgba(56, 139, 253, 0.14)' : '#deebff',
         },
         'DONE': {
             name: 'Done',
-            color: '#216e4e',
-            bgColor: '#f8f9fa',
+            color: isDark ? '#3fb950' : '#216e4e',
+            bgColor: isDark ? '#1c2128' : '#f8f9fa',
+            dragBgColor: isDark ? 'rgba(63, 185, 80, 0.16)' : '#dffcf0',
         },
     };
 
     /**
-     * Initialize with active sprint
+     * Initialize with active sprint if no selection exists
      */
     useEffect(() => {
-        if (activeSprint) {
-            setSelectedSprint(activeSprint._id);
-        } else if (sprints.length > 0) {
-            setSelectedSprint(sprints[0]._id);
+        if (selectedSprintId === 'general' && activeSprint) {
+            // If it's general, we stay general. 
+            // But if we want to auto-select active on first load:
+            // setSelectedSprintId(activeSprint._id);
         }
-    }, [sprints, activeSprint]);
+    }, [activeSprint, selectedSprintId]);
 
-    /**
-     * Load sprint tasks and calculate metrics
-     */
-    useEffect(() => {
-        if (selectedSprint && currentProject) {
-            loadSprintTasks();
-        }
-    }, [selectedSprint, currentProject, refreshTrigger]);
-
-    /**
-     * Reload when sprints data changes (when tasks are created/updated)
-     */
-    useEffect(() => {
-        if (selectedSprint && sprints.length > 0) {
-            // Auto-reload tasks when sprint data updates
-            loadSprintTasks();
-        }
-    }, [sprints]);
-
-    const loadSprintTasks = async () => {
+    const loadSprintTasks = useCallback(async () => {
+        if (!selectedSprintId && !currentProject) return;
         setLoading(true);
         try {
-            // Fetch tasks for the selected sprint
-            const sprintTasks = await taskService.getTasksBySprint(selectedSprint);
-            
+            // Fetch tasks for the selected sprint OR all tasks for project if general
+            const sprintTasks = selectedSprintId === 'general' 
+                ? await taskService.getTasksByProject(currentProject._id)
+                : await taskService.getTasksBySprint(selectedSprintId);
+
             // Group tasks by status
             const groupedTasks = {
                 TODO: [],
@@ -123,12 +111,19 @@ const ScrumBoard = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [selectedSprintId, currentProject]);
+
+    useEffect(() => {
+        if (selectedSprintId && currentProject) {
+            loadSprintTasks();
+        }
+    }, [selectedSprintId, currentProject, refreshTrigger, loadSprintTasks, syncTrigger]);
+
 
     /**
      * Handle task drag and drop
      */
-    const handleDragEnd = async (result) => {
+    const handleDragEnd = useCallback(async (result) => {
         const { source, destination, draggableId } = result;
 
         // No-op if dropped outside valid area
@@ -146,9 +141,9 @@ const ScrumBoard = () => {
 
         // Optimistic UI update
         const taskToMove = [
-            ...tasks.TODO,
-            ...tasks.IN_PROGRESS,
-            ...tasks.DONE,
+            ...(tasks.TODO || []),
+            ...(tasks.IN_PROGRESS || []),
+            ...(tasks.DONE || []),
         ].find(t => t._id === taskId);
 
         if (taskToMove) {
@@ -165,8 +160,8 @@ const ScrumBoard = () => {
 
             // Update backend
             try {
-                await taskService.updateTask(taskId, { 
-                    status: newStatus.toLowerCase() 
+                await taskService.updateTask(taskId, {
+                    status: newStatus.toLowerCase()
                 });
             } catch (error) {
                 console.error('Failed to update task status:', error);
@@ -174,13 +169,14 @@ const ScrumBoard = () => {
                 loadSprintTasks();
             }
         }
-    };
+    }, [tasks, loadSprintTasks]);
 
     /**
      * Get selected sprint details
      */
     const getCurrentSprintDetails = () => {
-        return sprints.find(s => s._id === selectedSprint);
+        if (selectedSprintId === 'general') return { name: 'General (Project Wide)', status: 'Active' };
+        return sprints.find(s => s._id === selectedSprintId);
     };
 
     if (loading && Object.values(tasks).every(col => col.length === 0)) {
@@ -196,15 +192,18 @@ const ScrumBoard = () => {
                 <div className="sprint-selector-section">
                     <label>Select Sprint:</label>
                     <Select
-                        value={selectedSprint}
-                        onChange={setSelectedSprint}
-                        style={{ width: 250 }}
+                        value={selectedSprintId}
+                        onChange={setSelectedSprintId}
+                        style={{ width: 300 }}
                         placeholder="Select a sprint"
-                        options={sprints.map(sprint => ({
-                            label: `${sprint.name} (${sprint.status})`,
-                            value: sprint._id,
-                        }))}
-                    />
+                    >
+                        <Select.Option value="general">🌐 General (Project Wide)</Select.Option>
+                        {sprints.map(sprint => (
+                            <Select.Option key={sprint._id} value={sprint._id}>
+                                🏃 {sprint.name} ({sprint.status})
+                            </Select.Option>
+                        ))}
+                    </Select>
                 </div>
 
                 {currentSprint && (
@@ -232,14 +231,14 @@ const ScrumBoard = () => {
                             <Statistic
                                 title="To Do"
                                 value={sprintMetrics.todo}
-                                valueStyle={{ color: '#626f86' }}
+                                styles={{ content: { color: isDark ? '#8b949e' : '#626f86' } }}
                             />
                         </Col>
                         <Col xs={24} sm={12} md={6}>
                             <Statistic
                                 title="In Progress"
                                 value={sprintMetrics.inProgress}
-                                valueStyle={{ color: '#0052cc' }}
+                                styles={{ content: { color: isDark ? '#58a6ff' : '#0052cc' } }}
                             />
                         </Col>
                         <Col xs={24} sm={12} md={6}>
@@ -247,7 +246,7 @@ const ScrumBoard = () => {
                                 title="Completed"
                                 value={sprintMetrics.completed}
                                 suffix={`/ ${sprintMetrics.total}`}
-                                valueStyle={{ color: '#216e4e' }}
+                                styles={{ content: { color: isDark ? '#3fb950' : '#216e4e' } }}
                             />
                         </Col>
                     </Row>
@@ -271,7 +270,9 @@ const ScrumBoard = () => {
                                         ref={provided.innerRef}
                                         {...provided.droppableProps}
                                         style={{
-                                            backgroundColor: snapshot.isDraggingOver ? '#deebff' : columnConfig.bgColor,
+                                            backgroundColor: snapshot.isDraggingOver
+                                                ? columnConfig.dragBgColor
+                                                : columnConfig.bgColor,
                                             ...provided.droppableProps.style,
                                         }}
                                     >

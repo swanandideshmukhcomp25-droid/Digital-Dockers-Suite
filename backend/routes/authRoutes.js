@@ -1,11 +1,15 @@
 const express = require('express');
 const router = express.Router();
-const { registerUser, loginUser, getMe, googleAuthCallback } = require('../controllers/authController');
+const { registerUser, loginUser, getMe, logoutUser, googleAuthCallback } = require('../controllers/authController');
 const { protect } = require('../middlewares/authMiddleware');
 const passport = require('passport');
+const jwt = require('jsonwebtoken');
+
+const frontendUrl = process.env.CLIENT_URL || 'http://localhost:5173';
 
 router.post('/register', registerUser);
 router.post('/login', loginUser);
+router.post('/logout', logoutUser);
 router.get('/me', protect, getMe);
 
 // Google OAuth routes
@@ -31,7 +35,7 @@ router.get('/google/callback', (req, res, next) => {
                 // Calendar integration - skip passport, go directly to handler
                 return googleAuthCallback(req, res, next);
             }
-        } catch (error) {
+        } catch (_error) {
             // Invalid state, continue with passport authentication
             console.log('Invalid state token, using passport authentication');
         }
@@ -40,14 +44,13 @@ router.get('/google/callback', (req, res, next) => {
     // Normal login flow - use passport authentication
     passport.authenticate('google', {
         session: false,
-        failureRedirect: 'http://localhost:5173/login'
+        failureRedirect: `${frontendUrl}/login`
     })(req, res, next);
 }, googleAuthCallback);
 
 // Google Calendar connection routes (for adding to existing accounts)
 const { connectGoogleCalendarCallback, disconnectGoogleCalendar } = require('../controllers/authController');
 const { getCalendarAuthUrl } = require('../services/googleCalendarService');
-const jwt = require('jsonwebtoken');
 
 router.get('/google/calendar/auth', protect, (req, res) => {
     // Generate state with user ID for security

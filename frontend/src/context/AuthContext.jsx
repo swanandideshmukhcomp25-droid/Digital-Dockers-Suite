@@ -8,19 +8,31 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const checkLoggedIn = () => {
+        const checkLoggedIn = async () => {
             try {
-                const token = localStorage.getItem('token');
-                if (token) {
-                    const storedUser = localStorage.getItem('user');
-                    if (storedUser) {
-                        setUser(JSON.parse(storedUser));
-                    }
+                // Remove legacy token if it exists
+                localStorage.removeItem('token');
+
+                const storedUser = localStorage.getItem('user');
+                if (storedUser) {
+                    setUser(JSON.parse(storedUser));
+                }
+
+                // Verify session with backend if we expected to be logged in, or check anyway
+                const res = await api.get('/auth/me');
+                if (res.data) {
+                    setUser(res.data);
+                    localStorage.setItem('user', JSON.stringify(res.data));
                 }
             } catch (error) {
-                console.error("Auth check failed", error);
-                localStorage.removeItem('token');
+                // If 401, it just means no active session, which is normal for initial load.
+                if (error.response?.status !== 401) {
+                    console.error('Session check failed', error);
+                } else {
+                    console.log('No active session found (normal for first-time visitors)');
+                }
                 localStorage.removeItem('user');
+                setUser(null);
             } finally {
                 setLoading(false);
             }
@@ -31,8 +43,9 @@ export const AuthProvider = ({ children }) => {
     const login = async (email, password) => {
         try {
             const res = await api.post('/auth/login', { email, password });
-            const { token, ...userData } = res.data;
-            localStorage.setItem('token', token);
+            const userData = { ...res.data };
+            delete userData.token;
+            // Token is handled via HttpOnly cookie
             localStorage.setItem('user', JSON.stringify(userData)); // Save user data
             setUser(userData);
             return userData;
@@ -44,8 +57,9 @@ export const AuthProvider = ({ children }) => {
     const register = async (userData) => {
         try {
             const res = await api.post('/auth/register', userData);
-            const { token, ...user } = res.data;
-            localStorage.setItem('token', token);
+            const user = { ...res.data };
+            delete user.token;
+            // Token is handled via HttpOnly cookie
             localStorage.setItem('user', JSON.stringify(user)); // Save user data
             setUser(user);
             return user;
@@ -54,13 +68,20 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const logout = () => {
+    const logout = async () => {
+        try {
+            await api.post('/auth/logout');
+        } catch (error) {
+            console.error('Logout error', error);
+        }
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         setUser(null);
     };
 
     const setUserFromGoogle = useCallback((userData) => {
+        localStorage.removeItem('token');
+        localStorage.setItem('user', JSON.stringify(userData));
         setUser(userData);
     }, []);
 

@@ -14,15 +14,14 @@ const useSpaceWebSocket = (spaceId, userId) => {
 
   // Initialize WebSocket connection
   useEffect(() => {
-    const wsUrl = import.meta.env.VITE_WS_URL || window.location.origin;
-    const token = localStorage.getItem('token');
+    const wsUrl = import.meta.env.VITE_WS_URL || '/';
 
     const newSocket = io(wsUrl, {
-      auth: { token },
+      withCredentials: true,
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5
+      reconnectionAttempts: 5,
     });
 
     // Connection handlers
@@ -99,6 +98,7 @@ const useSpaceWebSocket = (spaceId, userId) => {
       console.error('❌ WebSocket error:', error);
     });
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSocket(newSocket);
 
     // Cleanup on unmount
@@ -157,7 +157,7 @@ const useSpaceWebSocket = (spaceId, userId) => {
   useEffect(() => {
     if (!socket) return;
 
-    socket.on('sync:full', (data) => {
+    socket.on('sync:full', () => {
       console.log('🔄 Full sync received');
       // Handle full sync in parent component
     });

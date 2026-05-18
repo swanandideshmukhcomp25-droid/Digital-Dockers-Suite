@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Layout, Button, Input, Avatar, Dropdown, Space, Typography, theme, Grid, List, Tag, Spin, Empty } from 'antd';
+import { Layout, Button, Input, Avatar, Dropdown, Space, Typography, theme, Grid, Tag, Spin, Empty } from 'antd';
 import {
     SearchOutlined,
     QuestionCircleOutlined,
@@ -32,8 +32,9 @@ const Header = ({ onMenuClick }) => {
     const navigate = useNavigate();
     const screens = useBreakpoint();
     const isMobile = !screens.md;
+    const isDarkMode = mode === 'dark';
 
-    // Roles that can create tasks
+    // Roles that can create issues/sprints from the global create modal
     const canCreate = ['admin', 'project_manager', 'technical_lead', 'marketing_lead'].includes(user?.role);
 
     const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -135,9 +136,12 @@ const Header = ({ onMenuClick }) => {
             width: 400,
             maxHeight: 400,
             overflow: 'auto',
-            backgroundColor: '#fff',
+            backgroundColor: isDarkMode ? '#161b22' : '#fff',
             borderRadius: 8,
-            boxShadow: '0 6px 16px rgba(0,0,0,0.12)',
+            border: `1px solid ${isDarkMode ? '#30363d' : '#f0f0f0'}`,
+            boxShadow: isDarkMode
+                ? '0 6px 20px rgba(0,0,0,0.45)'
+                : '0 6px 16px rgba(0,0,0,0.12)',
             padding: 8
         }}>
             {searchLoading ? (
@@ -149,41 +153,59 @@ const Header = ({ onMenuClick }) => {
                     {searchResults.tasks.length > 0 && (
                         <>
                             <Text type="secondary" style={{ padding: '8px 12px', display: 'block' }}>Issues</Text>
-                            <List
-                                size="small"
-                                dataSource={searchResults.tasks}
-                                renderItem={(item) => (
-                                    <List.Item
-                                        style={{ padding: '8px 12px', cursor: 'pointer' }}
+                            <div className="search-results-list">
+                                {searchResults.tasks.map((item) => (
+                                    <div
+                                        key={item._id}
+                                        style={{
+                                            padding: '8px 12px',
+                                            cursor: 'pointer',
+                                            color: isDarkMode ? '#e6edf3' : 'inherit',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            borderRadius: 6,
+                                            transition: 'background 0.2s'
+                                        }}
                                         onClick={() => handleSearchResultClick(item, 'task')}
+                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'}
+                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                                     >
                                         <Space>
                                             <Tag color="blue">{item.key}</Tag>
                                             <Text ellipsis style={{ maxWidth: 250 }}>{item.title}</Text>
                                         </Space>
-                                    </List.Item>
-                                )}
-                            />
+                                    </div>
+                                ))}
+                            </div>
                         </>
                     )}
                     {searchResults.projects.length > 0 && (
                         <>
                             <Text type="secondary" style={{ padding: '8px 12px', display: 'block' }}>Projects</Text>
-                            <List
-                                size="small"
-                                dataSource={searchResults.projects}
-                                renderItem={(item) => (
-                                    <List.Item
-                                        style={{ padding: '8px 12px', cursor: 'pointer' }}
+                            <div className="search-results-list">
+                                {searchResults.projects.map((item) => (
+                                    <div
+                                        key={item._id}
+                                        style={{
+                                            padding: '8px 12px',
+                                            cursor: 'pointer',
+                                            color: isDarkMode ? '#e6edf3' : 'inherit',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            borderRadius: 6,
+                                            transition: 'background 0.2s'
+                                        }}
                                         onClick={() => handleSearchResultClick(item, 'project')}
+                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'}
+                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                                     >
                                         <Space>
                                             <Tag color="purple">{item.key}</Tag>
                                             <Text>{item.name}</Text>
                                         </Space>
-                                    </List.Item>
-                                )}
-                            />
+                                    </div>
+                                ))}
+                            </div>
                         </>
                     )}
                 </>
@@ -210,53 +232,44 @@ const Header = ({ onMenuClick }) => {
                 }}
             >
                 {/* Left: Logo & Nav */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 12 : 24 }}>
-                    {isMobile && (
-                        <Button
-                            type="text"
-                            icon={<MenuOutlined />}
-                            onClick={onMenuClick}
-                            style={{ fontSize: 18 }}
-                        />
-                    )}
+                <div className="flex items-center gap-3 md:gap-6">
+                    <Button
+                        type="text"
+                        icon={<MenuOutlined />}
+                        onClick={onMenuClick}
+                        aria-label={isMobile ? 'Open navigation menu' : 'Toggle sidebar'}
+                        style={{ fontSize: 18, display: 'inline-flex' }}
+                    />
 
                     <div
                         style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
                         onClick={() => navigate('/dashboard')}
                     >
-                        <AppstoreOutlined style={{ fontSize: 24, color: '#0052CC' }} />
-                        {!isMobile && <Text strong style={{ fontSize: 18, color: '#172B4D' }}>Digital Dockers</Text>}
+                        <AppstoreOutlined style={{ fontSize: 24, color: '#3B82F6' }} />
+                        <Text
+                            strong
+                            style={{ fontSize: 18, color: isDarkMode ? '#e6edf3' : '#172B4D', display: isMobile ? 'none' : 'block' }}
+                        >
+                            Digital Dockers
+                        </Text>
                     </div>
 
-                    {!isMobile && (
-                        <Space size="middle">
-                            <Dropdown menu={{ items: projectMenu }} trigger={['click']}>
-                                <Button type="text">
-                                    {currentProject?.name || 'Projects'} <DownOutlined style={{ fontSize: 10 }} />
-                                </Button>
-                            </Dropdown>
-                            {screens.lg && (
-                                <>
-                                    <Button type="text" onClick={() => navigate('/dashboard/backlog')}>Backlog</Button>
-                                    <Button type="text" onClick={() => navigate('/dashboard/tasks')}>Board</Button>
-                                    <Button type="text" onClick={() => navigate('/dashboard/spaces')}>📝 Spaces</Button>
-                                    <Button type="text" onClick={() => navigate('/dashboard/organization')}>People</Button>
-                                </>
-                            )}
-                            {canCreate && (
-                                <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateModalOpen(true)}>
-                                    Create
-                                </Button>
-                            )}
-                        </Space>
-                    )}
+                    <Space size="middle" className="hidden md:flex">
+                        <Dropdown menu={{ items: projectMenu }} trigger={['click']}>
+                            <Button type="text">
+                                {currentProject?.name || 'Projects'} <DownOutlined style={{ fontSize: 10 }} />
+                            </Button>
+                        </Dropdown>
+                        <Button type="text" className="hidden lg:inline-flex" onClick={() => navigate('/dashboard/spaces')}>📝 Spaces</Button>
+                        <Button type="text" className="hidden lg:inline-flex" onClick={() => navigate('/dashboard/organization')}>People</Button>
+                    </Space>
                 </div>
 
                 {/* Right: Search & Profile */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 16 }}>
-                    {isMobile ? (
-                        <Button type="text" icon={<SearchOutlined />} />
-                    ) : (
+                <div className="flex items-center gap-2 md:gap-4">
+                    <Button type="text" icon={<SearchOutlined />} style={{ display: isMobile ? 'inline-flex' : 'none' }} />
+
+                    <div className="hidden md:block">
                         <Dropdown
                             popupRender={() => searchDropdownContent}
                             trigger={['click']}
@@ -264,34 +277,66 @@ const Header = ({ onMenuClick }) => {
                             onOpenChange={(open) => !open && setSearchOpen(false)}
                         >
                             <Input
-                                placeholder="Search issues and projects"
-                                prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-                                style={{ width: screens.lg ? 240 : 180, borderRadius: 4 }}
+                                placeholder="Search issues, projects, people..."
+                                prefix={<SearchOutlined style={{ color: isDarkMode ? '#8b949e' : '#9CA3AF' }} />}
+                                className="w-[280px] lg:w-[400px] rounded"
+                                style={{
+                                    borderRadius: 8,
+                                    height: 36,
+                                    fontSize: 13,
+                                    background: isDarkMode ? 'rgba(255,255,255,0.05)' : '#F9FAFB',
+                                }}
                                 value={searchQuery}
                                 onChange={handleSearchChange}
                                 onFocus={() => setSearchOpen(true)}
                                 allowClear
                             />
                         </Dropdown>
-                    )}
+                    </div>
 
-                    <Space size={isMobile ? 'small' : 'large'}>
-                        {!isMobile && (
-                            <>
-                                <HeaderCalendarDropdown />
-                                <NotificationsDropdown />
-                                <QuestionCircleOutlined
-                                    style={{ fontSize: 20, cursor: 'pointer', color: '#6B778C' }}
-                                    onClick={() => window.open('https://support.atlassian.com/jira-software-cloud/', '_blank')}
-                                />
-                            </>
-                        )}
+                    <Space className="gap-2 md:gap-6">
+                        <div className="hidden md:flex items-center gap-6">
+                            <HeaderCalendarDropdown />
+                            <NotificationsDropdown />
+                            <QuestionCircleOutlined
+                                style={{
+                                    fontSize: 20,
+                                    cursor: 'pointer',
+                                    color: isDarkMode ? '#8b949e' : '#6B778C'
+                                }}
+                                onClick={() => window.open('https://support.atlassian.com/jira-software-cloud/', '_blank')}
+                            />
+                        </div>
 
                         <Dropdown menu={{ items: userMenu }} trigger={['click']} placement="bottomRight">
-                            <Avatar style={{ backgroundColor: '#0052CC', cursor: 'pointer' }} icon={<UserOutlined />}>
-                                {user?.fullName?.[0]}
-                            </Avatar>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: '4px 8px', borderRadius: 8, transition: 'background 0.15s' }}
+                                onMouseEnter={(e) => { e.currentTarget.style.background = isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)'; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                            >
+                                <Avatar
+                                    style={{ backgroundColor: '#3B82F6', cursor: 'pointer', fontWeight: 600 }}
+                                    icon={<UserOutlined />}
+                                    size={32}
+                                >
+                                    {user?.fullName?.[0]}
+                                </Avatar>
+                                {!isMobile && (
+                                    <Text
+                                        className="hidden lg:block"
+                                        style={{ fontSize: 13, fontWeight: 500, color: isDarkMode ? '#e6edf3' : '#172B4D', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                    >
+                                        {user?.fullName?.split(' ')[0]}
+                                    </Text>
+                                )}
+                                <DownOutlined style={{ fontSize: 9, color: isDarkMode ? '#8b949e' : '#6B7280' }} className="hidden lg:block" />
+                            </div>
                         </Dropdown>
+
+                        {canCreate && (
+                            <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateModalOpen(true)} className="hidden md:flex bg-[#0052CC]">
+                                Create
+                            </Button>
+                        )}
                     </Space>
                 </div>
             </AntHeader>

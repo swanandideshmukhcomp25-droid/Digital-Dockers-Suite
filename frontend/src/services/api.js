@@ -1,19 +1,29 @@
 import axios from 'axios';
 
+// Use environment variable for production, fallback to localhost:5002 for local dev
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
 const api = axios.create({
-    baseURL: '/api',
+    baseURL: `${API_BASE_URL}/api`,
     headers: {
         'Content-Type': 'application/json',
     },
+    withCredentials: true,
 });
 
-// Request interceptor to add token
+const isAuthMeRequest = (requestUrl = '') => {
+    return requestUrl === '/auth/me' || requestUrl.endsWith('/auth/me');
+};
+
+const isPublicPath = (pathname = '') => {
+    const publicRoutes = ['/', '/login', '/register', '/auth/google/callback'];
+    return publicRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+};
+
+// We keep request interceptor for logging or other custom headers, but token is in cookie
 api.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem('token');
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-        }
+        // Token is handled via HttpOnly cookie automatically.
         return config;
     },
     (error) => Promise.reject(error)
@@ -22,10 +32,26 @@ api.interceptors.request.use(
 // Response interceptor to handle 401
 api.interceptors.response.use(
     (response) => response,
-    (error) => {
+    async (error) => {
         if (error.response?.status === 401) {
-            localStorage.removeItem('token');
-            window.location.href = '/login';
+            const requestUrl = error.config?.url || '';
+            const currentPath = window.location.pathname;
+            const authMeRequest = isAuthMeRequest(requestUrl);
+
+            // Prevent infinite loops if the logout route itself returns 401
+            if (!authMeRequest && requestUrl !== '/auth/logout') {
+                try {
+                    await axios.post(`${API_BASE_URL}/api/auth/logout`, {}, { withCredentials: true });
+                } catch (e) {
+                    console.error('Logout failed to clear cookie', e);
+                }
+            }
+            localStorage.removeItem('user');
+            
+            // Do not force redirect on auth bootstrap (/auth/me) or on public pages.
+            if (!authMeRequest && !isPublicPath(currentPath) && !currentPath.startsWith('/login')) {
+                window.location.href = '/login';
+            }
         }
         return Promise.reject(error);
     }

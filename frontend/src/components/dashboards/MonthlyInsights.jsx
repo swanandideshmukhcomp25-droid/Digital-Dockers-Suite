@@ -3,9 +3,12 @@ import { Row, Col, Card, Statistic } from 'antd';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 import { getVelocityTrend, calculateCapacityUtilization } from '../../utils/monthlyProgressData';
+import { useThemeMode } from '../../context/ThemeContext';
 import './MonthlyInsights.css';
 
 const MonthlyInsights = ({ monthsData }) => {
+    const { mode } = useThemeMode();
+    const isDark = mode === 'dark';
     const velocityTrend = getVelocityTrend(monthsData, 5);
     const capacityData = calculateCapacityUtilization(monthsData);
 
@@ -27,7 +30,7 @@ const MonthlyInsights = ({ monthsData }) => {
                             value={capacityData.averageVelocity}
                             suffix="points/month"
                             prefix={<span className="velocity-badge">📊</span>}
-                            valueStyle={{ color: '#1890ff' }}
+                            styles={{ content: { color: '#1890ff' } }}
                         />
                     </Col>
                     <Col xs={24} sm={12} md={6}>
@@ -36,7 +39,7 @@ const MonthlyInsights = ({ monthsData }) => {
                             value={velocities[velocities.length - 1]}
                             suffix="points"
                             prefix={velocityTrend_direction === 'up' ? <ArrowUpOutlined style={{ color: '#52c41a' }} /> : <ArrowDownOutlined style={{ color: '#ff4d4f' }} />}
-                            valueStyle={{ color: velocityTrend_direction === 'up' ? '#52c41a' : '#ff4d4f' }}
+                            styles={{ content: { color: velocityTrend_direction === 'up' ? '#52c41a' : '#ff4d4f' } }}
                         />
                     </Col>
                     <Col xs={24} sm={12} md={6}>
@@ -44,7 +47,7 @@ const MonthlyInsights = ({ monthsData }) => {
                             title="Estimated Burndown"
                             value="4 months"
                             prefix="⏱️"
-                            valueStyle={{ color: '#faad14' }}
+                            styles={{ content: { color: '#faad14' } }}
                         />
                     </Col>
                     <Col xs={24} sm={12} md={6}>
@@ -53,7 +56,7 @@ const MonthlyInsights = ({ monthsData }) => {
                             value="85%"
                             suffix="%"
                             prefix="✅"
-                            valueStyle={{ color: '#52c41a' }}
+                            styles={{ content: { color: '#52c41a' } }}
                         />
                     </Col>
                 </Row>
@@ -70,15 +73,17 @@ const MonthlyInsights = ({ monthsData }) => {
                                 <stop offset="95%" stopColor="#1890ff" stopOpacity={0}/>
                             </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                        <XAxis dataKey="month" />
-                        <YAxis />
+                        <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#f0f0f0'} />
+                        <XAxis dataKey="month" tick={{ fill: isDark ? '#94a3b8' : '#666' }} />
+                        <YAxis tick={{ fill: isDark ? '#94a3b8' : '#666' }} />
                         <Tooltip
                             contentStyle={{
-                                backgroundColor: '#fff',
-                                border: '1px solid #f0f0f0',
-                                borderRadius: 4
+                                backgroundColor: isDark ? '#1e293b' : '#fff',
+                                border: `1px solid ${isDark ? '#334155' : '#f0f0f0'}`,
+                                borderRadius: 4,
+                                color: isDark ? '#f1f5f9' : '#000'
                             }}
+                            itemStyle={{ color: isDark ? '#f1f5f9' : '#000' }}
                             formatter={(value) => [`${value} points`, 'Velocity']}
                         />
                         <Area
@@ -104,7 +109,7 @@ const MonthlyInsights = ({ monthsData }) => {
                                     className="capacity-fill"
                                     style={{
                                         width: `${Math.min(month.capacityUtilization, 100)}%`,
-                                        backgroundColor: month.capacityUtilization > 100 ? '#ff4d4f' : '#52c41a'
+                                        backgroundColor: month.capacityUtilization > 100 ? '#ff4d4f' : '#3B82F6'
                                     }}
                                 >
                                     {month.capacityUtilization > 0 && (
@@ -124,21 +129,41 @@ const MonthlyInsights = ({ monthsData }) => {
             </Card>
 
             {/* Quick Tips */}
-            <Card className="insights-card tips-card">
-                <h3>🤖 AI Insights</h3>
-                <div className="tips-list">
-                    <div className="tip success">
-                        <strong>Strong Performance:</strong> Team has maintained consistent velocity. Keep up the momentum!
-                    </div>
-                    <div className="tip warning">
-                        <strong>Capacity Alert:</strong> March is overloaded at {capacityData.futureCapacity[1]?.capacityUtilization}%. Consider deferring non-critical items.
-                    </div>
-                    <div className="tip info">
-                        <strong>Trend:</strong> Velocity improving month-over-month. {velocityTrend_direction === 'up' ? 'Team efficiency increasing.' : 'Monitor for bottlenecks.'}
-                    </div>
-                    <div className="tip info">
-                        <strong>Recommendation:</strong> With current velocity, project completes in ~4 months. Adjust scope or add resources if timeline critical.
-                    </div>
+            <Card 
+                className="insights-card tips-card" 
+                styles={{ body: { padding: '16px 20px' } }} 
+                style={{ 
+                    backgroundColor: isDark ? 'rgba(30, 41, 59, 0.5)' : '#f8fafc', 
+                    border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}` 
+                }}
+            >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                    <span style={{ fontSize: 16 }}>✨</span>
+                    <strong style={{ color: isDark ? '#f1f5f9' : '#0f172a', fontSize: 14 }}>AI Insights</strong>
+                </div>
+                <div className="tips-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 12 }}>
+                    {[
+                        { label: 'Strong Performance:', text: 'Team has maintained consistent velocity. Keep up the momentum!', color: '#10B981' },
+                        { label: 'Capacity Alert:', text: `March is overloaded at ${capacityData.futureCapacity[1]?.capacityUtilization}%. Consider deferring items.`, color: '#EF4444' },
+                        { label: 'Trend:', text: `Velocity improving month-over-month. ${velocityTrend_direction === 'up' ? 'Team efficiency increasing.' : 'Monitor for bottlenecks.'}`, color: '#3B82F6' },
+                        { label: 'Forecast:', text: 'With current velocity, project completes in ~4 months.', color: '#8B5CF6' }
+                    ].map((tip, idx) => (
+                        <div 
+                            key={idx} 
+                            className="tip" 
+                            style={{ 
+                                backgroundColor: isDark ? '#1e293b' : '#fff', 
+                                padding: 12, 
+                                borderRadius: 6, 
+                                border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`, 
+                                fontSize: 13,
+                                color: isDark ? '#cbd5e1' : 'inherit'
+                            }}
+                        >
+                            <span style={{ color: tip.color, fontWeight: 600, marginRight: 4 }}>{tip.label}</span> 
+                            {tip.text}
+                        </div>
+                    ))}
                 </div>
             </Card>
         </div>
